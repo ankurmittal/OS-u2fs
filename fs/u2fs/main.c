@@ -13,30 +13,190 @@
 #include <linux/module.h>
 
 /*
+ * make sure the branch we just looked up (nd) makes sense:
+ *
+ * 1) we're not trying to stack u2fs on top of u2fs
+ * 2) it exists
+ * 3) is a directory
+ */
+int check_branch(const struct path *path)
+{
+	/* XXX: remove in ODF code -- stacking u2s allowed there */
+	if (!strcmp(path->dentry->d_sb->s_type->name, U2FS_NAME))
+		return -EINVAL;
+	if (!path->dentry->d_inode)
+		return -ENOENT;
+	if (!S_ISDIR(path->dentry->d_inode->i_mode))
+		return -ENOTDIR;
+	return 0;
+}
+
+
+static int u2fs_get_path(char *dir, struct path *path)
+{
+	err = kern_path(dir, LOOKUP_FOLLOW, path);
+	if (err) {
+		printk(KERN_ERR "u2fs: error accessing "
+				"lower directory '%s' (error %d)\n",
+				name, err);
+		return err;
+	}
+
+	err = check_branch(path);
+	if (err) {
+		printk(KERN_ERR "u2fs: lower directory "
+				"'%s' is not a valid branch\n", name);
+		path_put(path);
+		return err;
+	}
+}
+
+/* checks if two lower_dentries have overlapping branches */
+static int is_branch_overlap(struct dentry *dent1, struct dentry *dent2)
+{
+	struct dentry *dent = NULL;
+
+	dent = dent1;
+	while ((dent != dent2) && (dent->d_parent != dent))
+		dent = dent->d_parent;
+
+	if (dent == dent2)
+		return 1;
+
+	dent = dent2;
+	while ((dent != dent1) && (dent->d_parent != dent))
+		dent = dent->d_parent;
+
+	return (dent == dent1);
+}
+
+
+/*
+ * Parse mount options.  See the manual page for usage instructions.
+ *
+ * Returns the dentry object of the lower-level (lower) directory;
+ * We want to mount our stackable file system on top of that lower directory.
+ */
+static struct u2fs_dentry_info *u2fs_parse_options(
+		struct super_block *sb,
+		char *options)
+{
+	struct u2fs_dentry_info *root_info;
+	char *optname, *ldir, *rdir;
+	struct path lpath, rpath;
+	int err = 0;
+	int bindex;
+	int ldirsfound = 0;
+	int rdirsfound = 0;
+
+	/* allocate private data area */
+	err = -ENOMEM;
+	root_info =
+		kzalloc(sizeof(struct u2fs_dentry_info), GFP_KERNEL);
+	if (unlikely(!root_info))
+		goto out_error;
+
+	while ((optname = strsep(&options, ",")) != NULL) {
+		char *optarg;
+
+		if (!optname || !*optname)
+			continue;
+
+		optarg = strchr(optname, '=');
+		if (optarg)
+			*optarg++ = '\0';
+
+		/*
+		 * All of our options take an argument now. Insert ones that
+		 * don't, above this check.
+		 */
+		if (!optarg) {
+			printk(KERN_ERR "u2fs: %s requires an argument\n",
+					optname);
+			err = -EINVAL;
+			goto out_error;
+		}
+
+		if (!strcmp("ldir", optname)) {
+			if (++ldirsfound > 1) {
+				printk(KERN_ERR
+						"u2fs: multiple ldirs specified\n");
+				err = -EINVAL;
+				goto out_error;
+			}
+			ldir = optarg;
+			continue;
+		}
+
+		if (!strcmp("rdir", optname)) {
+			if (++rdirsfound > 1) {
+				printk(KERN_ERR
+						"u2fs: multiple rdirs specified\n");
+				err = -EINVAL;
+				goto out_error;
+			}
+			rdir = optarg;
+			continue;
+		}
+
+		err = -EINVAL;
+		printk(KERN_ERR
+				"u2fs: unrecognized option '%s'\n", optname);
+		goto out_error;
+	}
+	if (ldirsfound != 1 || rdirsfound != 1) {
+		printk(KERN_ERR "u2fs: ldirs and rdirs option required\n");
+		err = -EINVAL;
+		goto out_error;
+	}
+
+	err = u2fs_get_path(ldir, &lpath);
+	if(err) {
+		goto out_error;
+	}
+
+	err = u2fs_get_path(rdir, &rpath);
+	if(err) {
+		path_put(&lpath);
+		goto out_error;
+	}
+
+	if (is_branch_overlap(lpath.dentry, rpath.dentry)) {
+		printk(KERN_ERR "unionfs: Directories overlap\n");
+		err = -EINVAL;
+		path_put(&lpath);
+		path_put(&rpath);
+		goto out_error;
+	}
+
+	root_info->left_path.dentry = lpath.dentry;
+	root_info->left_path.mnt = lpath.mnt;
+	root_info->right_path.dentry = rpath.dentry;
+	root_info->right_path.mnt = rpath.mnt;
+	goto out;
+
+out_error:
+	kfree(root_info);
+	root_info = ERR_PTR(err);
+out:
+	return root_info;
+}
+
+
+/*
  * There is no need to lock the u2fs_super_info's rwsem as there is no
  * way anyone can have a reference to the superblock at this point in time.
  */
 static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 {
 	int err = 0;
-	struct super_block *lower_sb;
-	struct path lower_path;
-	char *dev_name = (char *) raw_data;
+	struct super_block *left_sb, *right_sb;
 	struct inode *inode;
 
-	if (!dev_name) {
-		printk(KERN_ERR
-		       "u2fs: read_super: missing dev_name argument\n");
-		err = -EINVAL;
-		goto out;
-	}
 
 	/* parse lower path */
-	err = kern_path(dev_name, LOOKUP_FOLLOW | LOOKUP_DIRECTORY,
-			&lower_path);
+	err = u2fs_parse_options(sb, raw_data);
 	if (err) {
-		printk(KERN_ERR	"u2fs: error accessing "
-		       "lower directory '%s'\n", dev_name);
 		goto out;
 	}
 
@@ -48,13 +208,18 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 		goto out_free;
 	}
 
-	/* set the lower superblock field of upper superblock */
-	lower_sb = lower_path.dentry->d_sb;
-	atomic_inc(&lower_sb->s_active);
-	u2fs_set_lower_super(sb, lower_sb);
+	/* set the lower superblock field of left superblock */
+	left_sb = left_path.dentry->d_sb;
+	atomic_inc(&left_sb->s_active);
+	u2fs_set_left_super(sb, left_sb);
 
-	/* inherit maxbytes from lower file system */
-	sb->s_maxbytes = lower_sb->s_maxbytes;
+	/* set the lower superblock field of right superblock */
+	right_sb = right_path.dentry->d_sb;
+	atomic_inc(&right_sb->s_active);
+	u2fs_set_right_super(sb, right_sb);
+
+	/* max Bytes is the maximum bytes from highest priority branch */
+	sb->s_maxbytes = left_sb->s_maxbytes;
 
 	/*
 	 * Our c/m/atime granularity is 1 ns because we may stack on file
@@ -65,7 +230,7 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_op = &u2fs_sops;
 
 	/* get a new inode and allocate our root dentry */
-	inode = u2fs_iget(sb, lower_path.dentry->d_inode);
+	inode = u2fs_iget(sb, left_path.dentry->d_inode);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		goto out_sput;
@@ -86,7 +251,7 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	/* if get here: cannot have error */
 
 	/* set the lower dentries for s_root */
-	u2fs_set_lower_path(sb->s_root, &lower_path);
+	u2fs_set_left_path(sb->s_root, &left_path);
 
 	/*
 	 * No need to call interpose because we already have a positive
@@ -96,8 +261,8 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	d_rehash(sb->s_root);
 	if (!silent)
 		printk(KERN_INFO
-		       "u2fs: mounted on top of %s type %s\n",
-		       dev_name, lower_sb->s_type->name);
+				"u2fs: mounted on top of %s type %s\n",
+				dev_name, left_sb->s_type->name);
 	goto out; /* all is well */
 
 	/* no longer needed: free_dentry_private_data(sb->s_root); */
@@ -107,23 +272,23 @@ out_iput:
 	iput(inode);
 out_sput:
 	/* drop refs we took earlier */
-	atomic_dec(&lower_sb->s_active);
+	atomic_dec(&left_sb->s_active);
 	kfree(U2FS_SB(sb));
 	sb->s_fs_info = NULL;
 out_free:
-	path_put(&lower_path);
+	path_put(&left_path);
 
 out:
 	return err;
 }
 
 struct dentry *u2fs_mount(struct file_system_type *fs_type, int flags,
-			    const char *dev_name, void *raw_data)
+		const char *dev_name, void *raw_data)
 {
-	void *lower_path_name = (void *) dev_name;
+	void *left_path_name = (void *) dev_name;
 
-	return mount_nodev(fs_type, flags, lower_path_name,
-			   u2fs_read_super);
+	return mount_nodev(fs_type, flags, left_path_name,
+			u2fs_read_super);
 }
 
 static struct file_system_type u2fs_fs_type = {
@@ -164,9 +329,9 @@ static void __exit exit_u2fs_fs(void)
 }
 
 MODULE_AUTHOR("Erez Zadok, Filesystems and Storage Lab, Stony Brook University"
-	      " (http://www.fsl.cs.sunysb.edu/)");
+		" (http://www.fsl.cs.sunysb.edu/)");
 MODULE_DESCRIPTION("U2fs " U2FS_VERSION
-		   " (http://u2fs.filesystems.org/)");
+		" (http://u2fs.filesystems.org/)");
 MODULE_LICENSE("GPL");
 
 module_init(init_u2fs_fs);
