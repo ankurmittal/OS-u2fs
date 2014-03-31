@@ -34,7 +34,7 @@ static int u2fs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 	err = lower_dentry->d_op->d_revalidate(lower_dentry, nd);
 	pathcpy(&nd->path, &saved_path);
 out:
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 

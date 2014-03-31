@@ -34,21 +34,22 @@ int check_branch(const struct path *path)
 
 static int u2fs_get_path(char *dir, struct path *path)
 {
-	err = kern_path(dir, LOOKUP_FOLLOW, path);
+	int err = kern_path(dir, LOOKUP_FOLLOW, path);
 	if (err) {
 		printk(KERN_ERR "u2fs: error accessing "
 				"lower directory '%s' (error %d)\n",
-				name, err);
+				dir, err);
 		return err;
 	}
 
 	err = check_branch(path);
 	if (err) {
 		printk(KERN_ERR "u2fs: lower directory "
-				"'%s' is not a valid branch\n", name);
+				"'%s' is not a valid branch\n", dir);
 		path_put(path);
 		return err;
 	}
+	return 0;
 }
 
 /* checks if two lower_dentries have overlapping branches */
@@ -82,10 +83,9 @@ static struct u2fs_dentry_info *u2fs_parse_options(
 		char *options)
 {
 	struct u2fs_dentry_info *root_info;
-	char *optname, *ldir, *rdir;
+	char *optname, *ldir = NULL, *rdir = NULL;
 	struct path lpath, rpath;
 	int err = 0;
-	int bindex;
 	int ldirsfound = 0;
 	int rdirsfound = 0;
 
@@ -162,7 +162,7 @@ static struct u2fs_dentry_info *u2fs_parse_options(
 	}
 
 	if (is_branch_overlap(lpath.dentry, rpath.dentry)) {
-		printk(KERN_ERR "unionfs: Directories overlap\n");
+		printk(KERN_ERR "u2fs: Directories overlap\n");
 		err = -EINVAL;
 		path_put(&lpath);
 		path_put(&rpath);
@@ -190,31 +190,44 @@ out:
 static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 {
 	int err = 0;
-	struct super_block *left_sb, *right_sb;
+	struct u2fs_dentry_info *root_info;
+	struct super_block *left_sb = NULL, *right_sb = NULL;
 	struct inode *inode;
-
-
-	/* parse lower path */
-	err = u2fs_parse_options(sb, raw_data);
-	if (err) {
+	if (!raw_data) {
+		printk(KERN_ERR
+				"u2fs: read_super: missing data argument\n");
+		err = -EINVAL;
 		goto out;
 	}
+
 
 	/* allocate superblock private data */
 	sb->s_fs_info = kzalloc(sizeof(struct u2fs_sb_info), GFP_KERNEL);
 	if (!U2FS_SB(sb)) {
 		printk(KERN_CRIT "u2fs: read_super: out of memory\n");
 		err = -ENOMEM;
-		goto out_free;
+		goto out;
+	}
+
+
+	/* parse lower path */
+	root_info = u2fs_parse_options(sb, raw_data);
+	if (IS_ERR(root_info)) {
+		printk(KERN_ERR
+				"u2fs: read_super: error while parsing options "
+				"(err = %ld)\n", PTR_ERR(root_info));
+		err = PTR_ERR(root_info);
+		root_info = NULL;
+		goto out_sput;
 	}
 
 	/* set the lower superblock field of left superblock */
-	left_sb = left_path.dentry->d_sb;
+	left_sb = root_info->left_path.dentry->d_sb;
 	atomic_inc(&left_sb->s_active);
 	u2fs_set_left_super(sb, left_sb);
 
 	/* set the lower superblock field of right superblock */
-	right_sb = right_path.dentry->d_sb;
+	right_sb = root_info->right_path.dentry->d_sb;
 	atomic_inc(&right_sb->s_active);
 	u2fs_set_right_super(sb, right_sb);
 
@@ -230,10 +243,10 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_op = &u2fs_sops;
 
 	/* get a new inode and allocate our root dentry */
-	inode = u2fs_iget(sb, left_path.dentry->d_inode);
+	inode = u2fs_iget(sb, root_info->left_path.dentry->d_inode);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
-		goto out_sput;
+		goto out_pput;
 	}
 	sb->s_root = d_alloc_root(inode);
 	if (!sb->s_root) {
@@ -251,7 +264,8 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	/* if get here: cannot have error */
 
 	/* set the lower dentries for s_root */
-	u2fs_set_left_path(sb->s_root, &left_path);
+	u2fs_set_left_path(sb->s_root, &(root_info->left_path));
+	u2fs_set_right_path(sb->s_root, &(root_info->right_path));
 
 	/*
 	 * No need to call interpose because we already have a positive
@@ -261,8 +275,8 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	d_rehash(sb->s_root);
 	if (!silent)
 		printk(KERN_INFO
-				"u2fs: mounted on top of %s type %s\n",
-				dev_name, left_sb->s_type->name);
+				"u2fs: mounted on top of test type %s\n",
+				 left_sb->s_type->name);
 	goto out; /* all is well */
 
 	/* no longer needed: free_dentry_private_data(sb->s_root); */
@@ -270,14 +284,15 @@ out_freeroot:
 	dput(sb->s_root);
 out_iput:
 	iput(inode);
+out_pput:
+	path_put(&(root_info->left_path));
+	path_put(&(root_info->right_path));
 out_sput:
 	/* drop refs we took earlier */
 	atomic_dec(&left_sb->s_active);
+	atomic_dec(&right_sb->s_active);
 	kfree(U2FS_SB(sb));
 	sb->s_fs_info = NULL;
-out_free:
-	path_put(&left_path);
-
 out:
 	return err;
 }

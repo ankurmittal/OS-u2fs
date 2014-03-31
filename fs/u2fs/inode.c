@@ -44,7 +44,7 @@ out:
 	mnt_drop_write(left_path.mnt);
 out_unlock:
 	unlock_dir(lower_parent_dentry);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
@@ -86,8 +86,8 @@ out:
 	mnt_drop_write(lower_new_path.mnt);
 out_unlock:
 	unlock_dir(lower_dir_dentry);
-	u2fs_put_left_path(old_dentry, &lower_old_path);
-	u2fs_put_left_path(new_dentry, &lower_new_path);
+	u2fs_put_path(old_dentry, &lower_old_path);
+	u2fs_put_path(new_dentry, &lower_new_path);
 	return err;
 }
 
@@ -131,7 +131,7 @@ out:
 out_unlock:
 	unlock_dir(lower_dir_dentry);
 	dput(lower_dentry);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
@@ -163,7 +163,7 @@ out:
 	mnt_drop_write(left_path.mnt);
 out_unlock:
 	unlock_dir(lower_parent_dentry);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
@@ -198,7 +198,7 @@ out:
 	mnt_drop_write(left_path.mnt);
 out_unlock:
 	unlock_dir(lower_parent_dentry);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
@@ -231,7 +231,7 @@ out:
 	mnt_drop_write(left_path.mnt);
 out_unlock:
 	unlock_dir(lower_dir_dentry);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
@@ -264,7 +264,7 @@ out:
 	mnt_drop_write(left_path.mnt);
 out_unlock:
 	unlock_dir(lower_parent_dentry);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
@@ -331,8 +331,8 @@ out:
 	unlock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
 	dput(lower_old_dir_dentry);
 	dput(lower_new_dir_dentry);
-	u2fs_put_left_path(old_dentry, &lower_old_path);
-	u2fs_put_left_path(new_dentry, &lower_new_path);
+	u2fs_put_path(old_dentry, &lower_old_path);
+	u2fs_put_path(new_dentry, &lower_new_path);
 	return err;
 }
 
@@ -357,7 +357,7 @@ static int u2fs_readlink(struct dentry *dentry, char __user *buf, int bufsiz)
 	fsstack_copy_attr_atime(dentry->d_inode, lower_dentry->d_inode);
 
 out:
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
@@ -481,7 +481,7 @@ static int u2fs_setattr(struct dentry *dentry, struct iattr *ia)
 	 */
 
 out:
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 out_err:
 	return err;
 }

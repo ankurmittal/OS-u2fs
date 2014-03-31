@@ -298,7 +298,7 @@ struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 				u2fs_lower_inode(parent->d_inode));
 
 out:
-	u2fs_put_left_path(parent, &lower_parent_path);
+	u2fs_put_path(parent, &lower_parent_path);
 	dput(parent);
 	return ret;
 }

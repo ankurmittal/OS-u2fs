@@ -134,7 +134,13 @@ static inline struct super_block *u2fs_lower_super(
 	return U2FS_SB(sb)->left_sb;
 }
 
-static inline void u2fs_set_lower_super(struct super_block *sb,
+static inline void u2fs_set_right_super(struct super_block *sb,
+					  struct super_block *val)
+{
+	U2FS_SB(sb)->right_sb = val;
+}
+
+static inline void u2fs_set_left_super(struct super_block *sb,
 					  struct super_block *val)
 {
 	U2FS_SB(sb)->left_sb = val;
@@ -156,10 +162,22 @@ static inline void u2fs_get_left_path(const struct dentry *dent,
 	spin_unlock(&U2FS_D(dent)->lock);
 	return;
 }
-static inline void u2fs_put_left_path(const struct dentry *dent,
-					 struct path *left_path)
+
+
+static inline void u2fs_put_path(const struct dentry *dent,
+					 struct path *path)
 {
-	path_put(left_path);
+	path_put(path);
+	return;
+}
+
+
+static inline void u2fs_set_right_path(const struct dentry *dent,
+					 struct path *right_path)
+{
+	spin_lock(&U2FS_D(dent)->lock);
+	pathcpy(&U2FS_D(dent)->right_path, right_path);
+	spin_unlock(&U2FS_D(dent)->lock);
 	return;
 }
 static inline void u2fs_set_left_path(const struct dentry *dent,

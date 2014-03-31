@@ -248,7 +248,7 @@ static int u2fs_fsync(struct file *file, loff_t start, loff_t end,
 	lower_file = u2fs_lower_file(file);
 	u2fs_get_left_path(dentry, &left_path);
 	err = vfs_fsync_range(lower_file, start, end, datasync);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 out:
 	return err;
 }

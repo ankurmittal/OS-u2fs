@@ -29,7 +29,7 @@ static void u2fs_put_super(struct super_block *sb)
 
 	/* decrement lower super references */
 	s = u2fs_lower_super(sb);
-	u2fs_set_lower_super(sb, NULL);
+	u2fs_set_left_super(sb, NULL);
 	atomic_dec(&s->s_active);
 
 	kfree(spd);
@@ -43,7 +43,7 @@ static int u2fs_statfs(struct dentry *dentry, struct kstatfs *buf)
 
 	u2fs_get_left_path(dentry, &left_path);
 	err = vfs_statfs(&left_path, buf);
-	u2fs_put_left_path(dentry, &left_path);
+	u2fs_put_path(dentry, &left_path);
 
 	/* set return buf to our f/s to avoid confusing user-level utils */
 	buf->f_type = U2FS_SUPER_MAGIC;
