@@ -80,6 +80,7 @@ struct u2fs_dentry_info {
 
 /* u2fs super-block data in memory */
 struct u2fs_sb_info {
+	char *dev_name;
 	struct super_block *left_sb;
 	struct super_block *right_sb;
 };

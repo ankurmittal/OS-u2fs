@@ -95,7 +95,7 @@ static struct u2fs_dentry_info *u2fs_parse_options(
 		kzalloc(sizeof(struct u2fs_dentry_info), GFP_KERNEL);
 	if (unlikely(!root_info))
 		goto out_error;
-
+	printk("arg: %s",options);
 	while ((optname = strsep(&options, ",")) != NULL) {
 		char *optarg;
 
@@ -285,25 +285,31 @@ out_freeroot:
 out_iput:
 	iput(inode);
 out_pput:
-	path_put(&(root_info->left_path));
-	path_put(&(root_info->right_path));
-out_sput:
 	/* drop refs we took earlier */
 	atomic_dec(&left_sb->s_active);
 	atomic_dec(&right_sb->s_active);
+	path_put(&(root_info->left_path));
+	path_put(&(root_info->right_path));
+out_sput:
 	kfree(U2FS_SB(sb));
 	sb->s_fs_info = NULL;
 out:
 	return err;
 }
-
-struct dentry *u2fs_mount(struct file_system_type *fs_type, int flags,
-		const char *dev_name, void *raw_data)
+static struct dentry *u2fs_mount(struct file_system_type *fs_type,
+		int flags, const char *dev_name,
+		void *raw_data)
 {
-	void *left_path_name = (void *) dev_name;
+	struct dentry *dentry;
 
-	return mount_nodev(fs_type, flags, left_path_name,
-			u2fs_read_super);
+	dentry = mount_nodev(fs_type, flags, raw_data, u2fs_read_super);
+	printk("iaddr: %p",dentry);
+	if (!IS_ERR(dentry)) {
+		printk("dev_name : %s", dev_name);
+		U2FS_SB(dentry->d_sb)->dev_name =
+			kstrdup(dev_name, GFP_KERNEL);
+	}
+	return dentry;
 }
 
 static struct file_system_type u2fs_fs_type = {
