@@ -32,7 +32,7 @@ int check_branch(const struct path *path)
 }
 
 
-static int u2fs_get_path(char *dir, struct path *path)
+static int u2fs_get_kern_path(char *dir, struct path *path)
 {
 	int err = kern_path(dir, LOOKUP_FOLLOW, path);
 	if (err) {
@@ -150,12 +150,12 @@ static struct u2fs_dentry_info *u2fs_parse_options(
 		goto out_error;
 	}
 
-	err = u2fs_get_path(ldir, &lpath);
+	err = u2fs_get_kern_path(ldir, &lpath);
 	if(err) {
 		goto out_error;
 	}
 
-	err = u2fs_get_path(rdir, &rpath);
+	err = u2fs_get_kern_path(rdir, &rpath);
 	if(err) {
 		path_put(&lpath);
 		goto out_error;
@@ -264,8 +264,8 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	/* if get here: cannot have error */
 
 	/* set the lower dentries for s_root */
-	u2fs_set_left_path(sb->s_root, &(root_info->left_path));
-	u2fs_set_right_path(sb->s_root, &(root_info->right_path));
+	u2fs_set_path(sb->s_root, &(root_info->left_path), 0);
+	u2fs_set_path(sb->s_root, &(root_info->right_path), 1);
 
 	/*
 	 * No need to call interpose because we already have a positive

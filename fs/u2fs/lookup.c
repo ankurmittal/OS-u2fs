@@ -240,11 +240,11 @@ out:
 static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 {
 	int err = 0, i;
-	struct vfsmount *lower_dir_mnt, &lower_mnt;
+	struct vfsmount *lower_dir_mnt, *lower_mnt;
 	struct dentry *lower_dir_dentry = NULL, *parent;
 	struct dentry *lower_dentry, *valid_d = NULL;
 	const char *name;
-	struct path *valid_path = NULL, *parent_path;
+	struct path *valid_path = NULL, *parent_path, left_path;
 	struct qstr this;
 
 	parent = dget_parent(dentry);
@@ -262,7 +262,8 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 		/* now start the actual lookup procedure */
 		lower_dir_dentry = parent_path->dentry;
 		lower_dir_mnt = parent_path->mnt;
-		lower_mnt = NULL:
+		lower_mnt = NULL;
+
 
 		/* if the lower dentry's parent does not exist, skip this */
 		if (!lower_dir_dentry || !lower_dir_dentry->d_inode)
@@ -277,7 +278,7 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 
 		if (IS_ERR(lower_dentry)) {
 			err = PTR_ERR(lower_dentry);
-			goto out_free;
+			goto out;
 		}
 
 		u2fs_set_lower_dentry(dentry, i, lower_dentry);
@@ -298,7 +299,7 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 		fsstack_copy_attr_atime(parent->d_inode,
 				lower_dir_dentry->d_inode);
 		if(!valid_path)
-			valid_path = u2fs_get_path(i);
+			valid_path = u2fs_get_path(lower_dentry, i);
 	}
 
 	//Do we need to remove negative dentry??
@@ -335,7 +336,7 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 setup_lower:
 	left_path.dentry = lower_dentry;
 	left_path.mnt = mntget(lower_dir_mnt);
-	u2fs_set__path(dentry, &left_path, 0);
+	u2fs_set_path(dentry, &left_path, 0);
 
 	/*
 	 * If the intent is to create a file, then don't return an error, so
@@ -350,7 +351,6 @@ out:
 	/* update parent directory's atime */
 	fsstack_copy_attr_atime(parent->d_inode,
 			u2fs_lower_inode(parent->d_inode));
-	u2fs_put_all_path(parent);
 	dput(parent);
 	return ERR_PTR(err);
 }
@@ -359,7 +359,6 @@ struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 		struct nameidata *nd)
 {
 	struct dentry *ret, *parent;
-	struct path left_parent_path;
 	int err = 0;
 	printk("in look up");
 	BUG_ON(!nd);

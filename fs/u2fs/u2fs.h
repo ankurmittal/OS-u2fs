@@ -154,21 +154,27 @@ static inline void pathcpy(struct path *dst, const struct path *src)
 	dst->mnt = src->mnt;
 }
 /* Returns struct path.  Caller must path_put it. */
-static inline void u2fs_get_left_path(const struct dentry *dent,
-					 struct path *left_path)
+static inline struct path *u2fs_get_path(const struct dentry *dent, int is_right)
 {
-	spin_lock(&U2FS_D(dent)->lock);
-	pathcpy(left_path, &U2FS_D(dent)->left_path);
-	path_get(left_path);
-	spin_unlock(&U2FS_D(dent)->lock);
-	return;
+	if (is_right)
+		return &U2FS_D(dent)->right_path;
+	else
+		return  &U2FS_D(dent)->left_path;
 }
 
 
-static inline void u2fs_put_path(const struct dentry *dent,
-					 struct path *path)
+
+
+static inline void u2fs_put_path(const struct dentry *denti, struct path *path)
 {
 	path_put(path);
+	return;
+}
+
+static inline void u2fs_put_all_paths(const struct dentry *dent)
+{
+	path_put(&U2FS_D(dent)->right_path);
+	path_put(&U2FS_D(dent)->left_path);
 	return;
 }
 
@@ -181,33 +187,103 @@ static inline void u2fs_set_right_path(const struct dentry *dent,
 	spin_unlock(&U2FS_D(dent)->lock);
 	return;
 }
-static inline void u2fs_set_left_path(const struct dentry *dent,
-					 struct path *left_path)
+
+static inline void u2fs_set_lower_dentry(struct dentry *dent, int is_right,
+		struct dentry *val)
+{
+	if(is_right)
+		U2FS_D(dent)->right_path.dentry = val;
+	else
+		U2FS_D(dent)->left_path.dentry = val;
+}
+
+static inline struct vfsmount *u2fs_get_lower_mnt(struct dentry *dent,
+		int is_right)
+{
+	if(is_right)
+		return U2FS_D(dent)->right_path.mnt;
+	else
+		return U2FS_D(dent)->left_path.mnt;
+}
+
+static inline void u2fs_set_lower_mnt(struct dentry *dent,
+		int is_right, struct vfsmount *val)
+{
+	if(is_right)
+		U2FS_D(dent)->right_path.mnt = val;
+	else
+		U2FS_D(dent)->left_path.mnt = val;
+}
+
+static inline struct vfsmount *u2fs_mntget(struct dentry *dentry,
+		int is_right)
+{
+	struct vfsmount *mnt;
+
+	mnt = mntget(u2fs_get_lower_mnt(dentry, is_right));
+
+	return mnt;
+}
+
+
+static inline void u2fs_set_path(const struct dentry *dent,
+		struct path *path, int is_right)
 {
 	spin_lock(&U2FS_D(dent)->lock);
-	pathcpy(&U2FS_D(dent)->left_path, left_path);
+	if(!is_right)
+		pathcpy(&U2FS_D(dent)->left_path, path);
+	else
+		pathcpy(&U2FS_D(dent)->right_path, path);
 	spin_unlock(&U2FS_D(dent)->lock);
 	return;
 }
-static inline void u2fs_reset_left_path(const struct dentry *dent)
+static inline void u2fs_reset_all_path(const struct dentry *dent)
 {
 	spin_lock(&U2FS_D(dent)->lock);
 	U2FS_D(dent)->left_path.dentry = NULL;
-	U2FS_D(dent)->left_path.mnt = NULL;
+	U2FS_D(dent)->left_path.dentry = NULL;
+	U2FS_D(dent)->right_path.mnt = NULL;
+	U2FS_D(dent)->right_path.mnt = NULL;
 	spin_unlock(&U2FS_D(dent)->lock);
 	return;
 }
-static inline void u2fs_put_reset_left_path(const struct dentry *dent)
+static inline void u2fs_put_reset_all_path(const struct dentry *dent)
 {
-	struct path left_path;
+	struct path path;
 	spin_lock(&U2FS_D(dent)->lock);
-	pathcpy(&left_path, &U2FS_D(dent)->left_path);
+	pathcpy(&path, &U2FS_D(dent)->right_path);
+	U2FS_D(dent)->right_path.dentry = NULL;
+	U2FS_D(dent)->right_path.mnt = NULL;
+	path_put(&path);
+	pathcpy(&path, &U2FS_D(dent)->left_path);
 	U2FS_D(dent)->left_path.dentry = NULL;
 	U2FS_D(dent)->left_path.mnt = NULL;
+	path_put(&path);
 	spin_unlock(&U2FS_D(dent)->lock);
-	path_put(&left_path);
 	return;
 }
+
+/* lock base inode mutex before calling lookup_one_len */
+static inline struct dentry *lookup_lck_len(const char *name,
+		struct dentry *base, int len)
+{
+	struct dentry *d;
+	//struct nameidata lower_nd;
+	//int err;
+
+	//	err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
+	//	if (unlikely(err < 0)) {
+	//		d = ERR_PTR(err);
+	//		goto out;
+	//	}
+	mutex_lock(&base->d_inode->i_mutex);
+	d = lookup_one_len(name, base, len);
+	//release_lower_nd(&lower_nd, err);
+	mutex_unlock(&base->d_inode->i_mutex);
+	//out:
+	return d;
+}
+
 
 /* locking helpers */
 static inline struct dentry *lock_parent(struct dentry *dentry)

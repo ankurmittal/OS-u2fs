@@ -18,23 +18,22 @@
  */
 static int u2fs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
-	struct path left_path, saved_path;
+	struct path *left_path, saved_path;
 	struct dentry *lower_dentry;
 	int err = 1;
 
 	if (nd && nd->flags & LOOKUP_RCU)
 		return -ECHILD;
 
-	u2fs_get_left_path(dentry, &left_path);
-	lower_dentry = left_path.dentry;
+	left_path = u2fs_get_path(dentry, 0);
+	lower_dentry = left_path->dentry;
 	if (!lower_dentry->d_op || !lower_dentry->d_op->d_revalidate)
 		goto out;
 	pathcpy(&saved_path, &nd->path);
-	pathcpy(&nd->path, &left_path);
+	pathcpy(&nd->path, left_path);
 	err = lower_dentry->d_op->d_revalidate(lower_dentry, nd);
 	pathcpy(&nd->path, &saved_path);
 out:
-	u2fs_put_path(dentry, &left_path);
 	return err;
 }
 
