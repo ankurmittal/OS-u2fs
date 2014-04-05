@@ -275,8 +275,8 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	d_rehash(sb->s_root);
 	if (!silent)
 		printk(KERN_INFO
-				"u2fs: mounted on top of test type %s\n",
-				 left_sb->s_type->name);
+				"u2fs: mounted on top of type %s and %s\n",
+				 left_sb->s_type->name,right_sb->s_type->name);
 	goto out; /* all is well */
 
 	/* no longer needed: free_dentry_private_data(sb->s_root); */

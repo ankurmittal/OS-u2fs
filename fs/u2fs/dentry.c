@@ -41,7 +41,7 @@ out:
 static void u2fs_d_release(struct dentry *dentry)
 {
 	/* release and reset the lower paths */
-	u2fs_put_reset_left_path(dentry);
+	u2fs_put_reset_all_path(dentry);
 	free_dentry_private_data(dentry);
 	return;
 }
