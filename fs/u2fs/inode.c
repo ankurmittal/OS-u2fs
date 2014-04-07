@@ -436,7 +436,7 @@ static int u2fs_setattr(struct dentry *dentry, struct iattr *ia)
 	/* prepare our own lower struct iattr (with the lower file) */
 	memcpy(&lower_ia, ia, sizeof(lower_ia));
 	if (ia->ia_valid & ATTR_FILE)
-		lower_ia.ia_file = u2fs_lower_file(ia->ia_file);
+		lower_ia.ia_file = u2fs_lower_file(ia->ia_file, 0);
 
 	/*
 	 * If shrinking, first truncate upper level to cancel writing dirty
