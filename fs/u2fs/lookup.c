@@ -358,11 +358,10 @@ out:
 struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 		struct nameidata *nd)
 {
-	struct dentry *ret, *parent;
+	struct dentry *ret;
 	int err = 0;
-	printk("in look up");
+	printk("in look up\n");
 	BUG_ON(!nd);
-	parent = dget_parent(dentry);
 
 
 	/* allocate dentry private data.  We free it in ->d_release */

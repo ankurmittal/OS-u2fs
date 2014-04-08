@@ -25,14 +25,21 @@ static int u2fs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 	if (nd && nd->flags & LOOKUP_RCU)
 		return -ECHILD;
 
+	printk("c1\n");
 	left_path = u2fs_get_path(dentry, 0);
+	printk("c2\n");
 	lower_dentry = left_path->dentry;
-	if (!lower_dentry->d_op || !lower_dentry->d_op->d_revalidate)
+	printk("c3\n");
+	if (!lower_dentry || !lower_dentry->d_op || !lower_dentry->d_op->d_revalidate)
 		goto out;
 	pathcpy(&saved_path, &nd->path);
+	printk("c4\n");
 	pathcpy(&nd->path, left_path);
+	printk("c5\n");
 	err = lower_dentry->d_op->d_revalidate(lower_dentry, nd);
+	printk("c6\n");
 	pathcpy(&nd->path, &saved_path);
+	printk("c7\n");
 out:
 	return err;
 }

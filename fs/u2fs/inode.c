@@ -98,10 +98,11 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 	struct inode *lower_dir_inode = u2fs_lower_inode(dir);
 	struct dentry *lower_dir_dentry;
 	struct path *left_path;
-
+printk("unlink\n");
 	left_path = u2fs_get_path(dentry, 0);
 	lower_dentry = left_path->dentry;
 	dget(lower_dentry);
+		printk("Dentry Use: %p\n", lower_dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
 
 	err = mnt_want_write(left_path->mnt);

@@ -55,9 +55,9 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	struct dentry *dentry = file->f_path.dentry;
 	int index;
 
-	printk("Read Dir Called");
+	printk("Read Dir Called\n");
 	for(index = 1; index >=0; index--) {
-		printk("lowerFile %d",index);
+		printk("lowerFile %d\n",index);
 		lower_file = u2fs_lower_file(file, index);
 		if(!lower_file)
 			continue;
@@ -181,7 +181,9 @@ static int __open_dir(struct inode *inode, struct file *file,
 	struct vfsmount *lower_mnt;
 	struct dentry *dentry = file->f_path.dentry;
 	int index;
-
+	 printk("Dentry Use: %p\n", dentry);
+	printk("Dentry Count %d\n", dentry->d_count);
+	printk("Open Directory\n");
 	for (index = 0; index < 2; index++) {
 		lower_dentry =
 			u2fs_get_lower_dentry(dentry, index);
@@ -189,6 +191,7 @@ static int __open_dir(struct inode *inode, struct file *file,
 			continue;
 
 		dget(lower_dentry);
+		printk("Dentry Use: %p\n", lower_dentry);
 		lower_mnt = u2fs_mntget(dentry, index);
 		if (!lower_mnt)
 			lower_mnt = u2fs_mntget(parent, index);
@@ -222,8 +225,8 @@ static int __open_file(struct inode *inode, struct file *file,
 	struct vfsmount *lower_mnt;
 	int bIndex = 0;
 
+	printk("Open File\n");
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
-	printk("Open Called");
 	if(!lower_dentry) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, 1);
 		bIndex = 1;
@@ -259,6 +262,7 @@ static int __open_file(struct inode *inode, struct file *file,
 
 	dget(lower_dentry);
 
+		printk("Dentry Use: %p\n", lower_dentry);
 	/*
 	 * dentry_open will decrement mnt refcnt if err.
 	 * otherwise fput() will do an mntput() for us upon file close.
@@ -286,6 +290,8 @@ int u2fs_open(struct inode *inode, struct file *file)
 	parent = u2fs_lock_parent(dentry);
 	//u2fs_lock_dentry(dentry, U2FS_DMUTEX_CHILD);
 
+	printk("Dentry Count %d\n", dentry->d_count);
+	printk("Parent Count %d\n", parent->d_count);
 	/* don't open unhashed/deleted files */
 	if (d_deleted(dentry)) {
 		err = -ENOENT;
@@ -349,13 +355,34 @@ static int u2fs_flush(struct file *file, fl_owner_t id)
 static int u2fs_file_release(struct inode *inode, struct file *file)
 {
 	struct file *lower_file;
+	struct dentry *lower_dentry;
+	struct dentry *dentry = file->f_path.dentry;
 	int index;
+	printk("Dentry Address %p\n", dentry);
+	printk("Dentry Count %d\n", dentry->d_count);
 	for(index = 0; index < 2; index++){
+
 		lower_file = u2fs_lower_file(file, index);
 		if (lower_file) {
 			u2fs_set_lower_file(file, index, NULL);
 			fput(lower_file);
 		}
+
+		lower_dentry =
+			u2fs_get_lower_dentry(dentry, index);
+		if (!lower_dentry)
+			continue;
+		printk("Dentry put %p\n", lower_dentry);
+		//TODO: Check for all references
+		if(d_deleted(lower_dentry)) {
+			dput(lower_dentry);
+			u2fs_set_lower_dentry(dentry, index, NULL);
+		}
+	}
+	if (dentry) {
+		//	dput(dentry);
+		printk("Dentry Address %p\n", dentry);
+		printk("Dentry Count %d\n", dentry->d_count);
 	}
 
 	kfree(U2FS_F(file));
