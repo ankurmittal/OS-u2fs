@@ -321,6 +321,11 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 	this.name = name;
 	this.len = strlen(name);
 	this.hash = full_name_hash(this.name, this.len);
+
+	parent_path = u2fs_get_path(parent, 0);
+	/* now start the actual lookup procedure */
+	lower_dir_dentry = parent_path->dentry;
+
 	lower_dentry = d_lookup(lower_dir_dentry, &this);
 	if (lower_dentry)
 		goto setup_lower;

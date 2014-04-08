@@ -243,6 +243,7 @@ static int __open_file(struct inode *inode, struct file *file,
 		 * if the open will change the file, copy it up otherwise
 		 * defer it.
 		 */
+		 printk("in if\n");
 		if (lower_flags & O_TRUNC) {
 			//TODO:
 			/*int size = 0;
