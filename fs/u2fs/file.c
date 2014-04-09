@@ -14,12 +14,18 @@
 static ssize_t u2fs_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
-	int err;
+	int err = -ENOENT, i;
 	struct file *lower_file;
-	struct dentry *dentry = file->f_path.dentry;
-
-	lower_file = u2fs_lower_file(file, 0);
-	err = vfs_read(lower_file, buf, count, ppos);
+	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
+	UDBG;
+ 	for(i=0; i < 2; i++) {
+		lower_dentry = u2fs_get_lower_dentry(dentry, i);
+		if (!lower_dentry || !lower_dentry->d_inode)
+			continue;
+		lower_file = u2fs_lower_file(file, i);
+		err = vfs_read(lower_file, buf, count, ppos);
+		break;
+	}
 	/* update our inode atime upon a successful lower read */
 	if (err >= 0)
 		fsstack_copy_attr_atime(dentry->d_inode,
@@ -228,7 +234,7 @@ static int __open_file(struct inode *inode, struct file *file,
 
 	printk("Open File\n");
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
-	if(!lower_dentry) {
+	if(!lower_dentry || !lower_dentry->d_inode) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, 1);
 		bIndex = 1;
 	}
@@ -394,30 +400,45 @@ static int u2fs_file_release(struct inode *inode, struct file *file)
 static int u2fs_fsync(struct file *file, loff_t start, loff_t end,
 		int datasync)
 {
-	int err;
-	struct file *lower_file;
-	struct path *left_path;
-	struct dentry *dentry = file->f_path.dentry;
+	int err, i;
+	struct file *lower_file = NULL;
+	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
 
+	UDBG;
 	err = generic_file_fsync(file, start, end, datasync);
 	if (err)
 		goto out;
-	lower_file = u2fs_lower_file(file, 0);
-	left_path = u2fs_get_path(dentry, 0);
-	err = vfs_fsync_range(lower_file, start, end, datasync);
-	//	u2fs_put_path(dentry, &left_path);
+	err = -ENOENT;
+ 	for(i=0; i < 2; i++) {
+		lower_dentry = u2fs_get_lower_dentry(dentry, i);
+		if (!lower_dentry || !lower_dentry->d_inode)
+			continue;
+		lower_file = u2fs_lower_file(file, i);
+		err = vfs_fsync_range(lower_file, start, end, datasync);
+		break;
+	}
 out:
 	return err;
 }
 
 static int u2fs_fasync(int fd, struct file *file, int flag)
 {
-	int err = 0;
+	int err = 0, i;
 	struct file *lower_file = NULL;
+	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
+	err = -ENOENT;
+	UDBG;
+	for(i=0; i < 2; i++) {
+		lower_dentry = u2fs_get_lower_dentry(dentry, i);
+		if (!lower_dentry || !lower_dentry->d_inode)
+			continue;
+		lower_file = u2fs_lower_file(file, i);
+		err = 0;
+		if (lower_file->f_op && lower_file->f_op->fasync)
+			err = lower_file->f_op->fasync(fd, lower_file, flag);
+		break;
+	}
 
-	lower_file = u2fs_lower_file(file, 0);
-	if (lower_file->f_op && lower_file->f_op->fasync)
-		err = lower_file->f_op->fasync(fd, lower_file, flag);
 
 	return err;
 }
