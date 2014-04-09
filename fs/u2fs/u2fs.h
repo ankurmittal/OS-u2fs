@@ -67,6 +67,7 @@ struct u2fs_file_info {
 	struct file *right_file;
 	struct file *left_file;
 	const struct vm_operations_struct *lower_vm_ops;
+	bool wrote_to_file;
 };
 
 /* u2fs inode data in memory */

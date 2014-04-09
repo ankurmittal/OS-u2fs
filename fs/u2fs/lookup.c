@@ -201,14 +201,16 @@ int u2fs_interpose(struct dentry *dentry, struct super_block *sb,
 {
 	int err = 0, i;
 	struct inode *inode;
-	struct inode *lower_inode;
+	struct inode *lower_inode = NULL;
 	struct super_block *left_sb;
 	struct dentry *l_dentry;
 
 	for(i=0; i < 2; i++) {
 		l_dentry = u2fs_get_lower_dentry(dentry, i);
-		if (l_dentry && l_dentry->d_inode)
+		if (l_dentry && l_dentry->d_inode) {
 			lower_inode = l_dentry->d_inode;
+			break;
+		}
 	}
 	left_sb = u2fs_lower_super(sb);
 

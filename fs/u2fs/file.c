@@ -29,30 +29,48 @@ static ssize_t u2fs_read(struct file *file, char __user *buf,
 	/* update our inode atime upon a successful lower read */
 	if (err >= 0)
 		fsstack_copy_attr_atime(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+				lower_file->f_path.dentry->d_inode);
 
 	return err;
 }
 
 static ssize_t u2fs_write(struct file *file, const char __user *buf,
-			    size_t count, loff_t *ppos)
+		size_t count, loff_t *ppos)
 {
-	int err = 0;
+	int err = -ENOENT, i;
 	struct file *lower_file;
-	struct dentry *dentry = file->f_path.dentry;
+	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
 
-	lower_file = u2fs_lower_file(file, 0);
-	err = vfs_write(lower_file, buf, count, ppos);
+	//u2fs_read_lock(dentry->d_sb, U2FS_SMUTEX_PARENT);
+	//u2fs_lock_dentry(dentry, U2FS_DMUTEX_CHILD);
+
+	//err = u2fs_file_revalidate(file, parent, true);
+	//if (unlikely(err))
+	//	goto out;
+
+ 	for(i=0; i < 2; i++) {
+		lower_dentry = u2fs_get_lower_dentry(dentry, i);
+		if (!lower_dentry || !lower_dentry->d_inode)
+			continue;
+		lower_file = u2fs_lower_file(file, i);
+		err = vfs_write(lower_file, buf, count, ppos);
+		break;
+	}
 	/* update our inode times+sizes upon a successful lower write */
 	if (err >= 0) {
 		fsstack_copy_inode_size(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+				lower_file->f_path.dentry->d_inode);
 		fsstack_copy_attr_times(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+				lower_file->f_path.dentry->d_inode);
+		U2FS_F(file)->wrote_to_file = true; /* for delayed copyup */
+	//	u2fs_check_file(file);
 	}
 
+	//u2fs_unlock_dentry(dentry);
+	//u2fs_read_unlock(dentry->d_sb);
 	return err;
 }
+
 
 static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 {
@@ -78,7 +96,7 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 }
 
 static long u2fs_unlocked_ioctl(struct file *file, unsigned int cmd,
-				  unsigned long arg)
+		unsigned long arg)
 {
 	long err = -ENOTTY;
 	struct file *lower_file;
@@ -97,7 +115,7 @@ out:
 
 #ifdef CONFIG_COMPAT
 static long u2fs_compat_ioctl(struct file *file, unsigned int cmd,
-				unsigned long arg)
+		unsigned long arg)
 {
 	long err = -ENOTTY;
 	struct file *lower_file;
@@ -139,7 +157,7 @@ static int u2fs_mmap(struct file *file, struct vm_area_struct *vma)
 	if (willwrite && !lower_file->f_mapping->a_ops->writepage) {
 		err = -EINVAL;
 		printk(KERN_ERR "u2fs: lower file system does not "
-		       "support writeable mmap\n");
+				"support writeable mmap\n");
 		goto out;
 	}
 
@@ -187,7 +205,7 @@ static int __open_dir(struct inode *inode, struct file *file,
 	struct vfsmount *lower_mnt;
 	struct dentry *dentry = file->f_path.dentry;
 	int index;
-	 printk("Dentry Use: %p\n", dentry);
+	printk("Dentry Use: %p\n", dentry);
 	printk("Dentry Count %d\n", dentry->d_count);
 	printk("Open Directory\n");
 	for (index = 0; index < 2; index++) {
@@ -250,15 +268,15 @@ static int __open_file(struct inode *inode, struct file *file,
 		 * if the open will change the file, copy it up otherwise
 		 * defer it.
 		 */
-		 printk("in if\n");
+		printk("in if\n");
 		if (lower_flags & O_TRUNC) {
 			//TODO:
 			/*int size = 0;
-			int err = -EROFS;
+			  int err = -EROFS;
 
-			 copyup the file
-			err = copyup_file(parent->d_inode, file, size);
-			return err;*/
+			  copyup the file
+			  err = copyup_file(parent->d_inode, file, size);
+			  return err;*/
 		} else {
 			/*
 			 * turn off writeable flags, to force delayed copyup
@@ -270,7 +288,7 @@ static int __open_file(struct inode *inode, struct file *file,
 
 	dget(lower_dentry);
 
-		printk("Dentry Use: %p\n", lower_dentry);
+	printk("Dentry Use: %p\n", lower_dentry);
 	/*
 	 * dentry_open will decrement mnt refcnt if err.
 	 * otherwise fput() will do an mntput() for us upon file close.
@@ -409,7 +427,7 @@ static int u2fs_fsync(struct file *file, loff_t start, loff_t end,
 	if (err)
 		goto out;
 	err = -ENOENT;
- 	for(i=0; i < 2; i++) {
+	for(i=0; i < 2; i++) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, i);
 		if (!lower_dentry || !lower_dentry->d_inode)
 			continue;
