@@ -138,7 +138,7 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
 	/* if found a cached inode, then just return it */
 	if (!(inode->i_state & I_NEW))
 		return inode;
-
+	UDBG;
 	/* initialize new inode */
 	info = U2FS_I(inode);
 
@@ -148,7 +148,7 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
 		return ERR_PTR(err);
 	}
 	u2fs_set_lower_inode(inode, lower_inode);
-
+	UDBG;
 	inode->i_version++;
 
 	/* use different set of inode ops for symlinks & directories */
@@ -199,12 +199,17 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
 int u2fs_interpose(struct dentry *dentry, struct super_block *sb,
 		struct path *lower_path)
 {
-	int err = 0;
+	int err = 0, i;
 	struct inode *inode;
 	struct inode *lower_inode;
 	struct super_block *left_sb;
+	struct dentry *l_dentry;
 
-	lower_inode = lower_path->dentry->d_inode;
+	for(i=0; i < 2; i++) {
+		l_dentry = u2fs_get_lower_dentry(dentry, i);
+		if (l_dentry && l_dentry->d_inode)
+			lower_inode = l_dentry->d_inode;
+	}
 	left_sb = u2fs_lower_super(sb);
 
 	/* check that the lower file system didn't cross a mount point */
@@ -300,11 +305,14 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 				lower_dir_dentry->d_inode);
 		if(!valid_path)
 			valid_path = u2fs_get_path(lower_dentry, i);
+		if(!valid_d)
+			valid_d = lower_dentry;
 	}
 
 	//Do we need to remove negative dentry??
 	if(valid_d) {
 		//Found Dentry
+		UDBG;
 		err = u2fs_interpose(dentry, dentry->d_sb, valid_path);
 		if (err) /* path_put underlying path on error */
 			u2fs_put_reset_all_path(dentry);
@@ -365,7 +373,7 @@ struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 {
 	struct dentry *ret;
 	int err = 0;
-	printk("in look up\n");
+	printk("in look up %s,\n", dentry->d_name.name);
 	BUG_ON(!nd);
 
 

@@ -191,12 +191,13 @@ static int __open_dir(struct inode *inode, struct file *file,
 			continue;
 
 		dget(lower_dentry);
-		printk("Dentry Use: %p\n", lower_dentry);
+		printk("Dentry Use:%s,%s, %p\n",lower_dentry->d_name.name, dentry->d_name.name, lower_dentry);
 		lower_mnt = u2fs_mntget(dentry, index);
 		if (!lower_mnt)
 			lower_mnt = u2fs_mntget(parent, index);
 		lower_file = dentry_open(lower_dentry, lower_mnt, file->f_flags,
 				current_cred());
+		UDBG;
 		if (IS_ERR(lower_file))
 			return PTR_ERR(lower_file);
 
