@@ -120,7 +120,7 @@ static long u2fs_compat_ioctl(struct file *file, unsigned int cmd,
 	long err = -ENOTTY;
 	struct file *lower_file;
 
-	lower_file = u2fs_lower_file(filei, 0);
+	lower_file = u2fs_lower_file(file, 0);
 
 	/* XXX: use vfs_ioctl if/when VFS exports it */
 	if (!lower_file || !lower_file->f_op)
