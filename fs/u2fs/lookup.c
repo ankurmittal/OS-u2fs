@@ -196,8 +196,7 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
  * @sb: u2fs's super_block
  * @left_path: the lower path (caller does path_get/put)
  */
-int u2fs_interpose(struct dentry *dentry, struct super_block *sb,
-		struct path *lower_path)
+int u2fs_interpose(struct dentry *dentry, struct super_block *sb)
 {
 	int err = 0, i;
 	struct inode *inode;
@@ -249,9 +248,10 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 	int err = 0, i;
 	struct vfsmount *lower_dir_mnt, *lower_mnt;
 	struct dentry *lower_dir_dentry = NULL, *parent;
-	struct dentry *lower_dentry, *valid_d = NULL;
+	struct dentry *lower_dentry, *wh_lower_dentry;
 	const char *name;
-	struct path *valid_path = NULL, *parent_path, left_path;
+	bool valid_detry_found = false;
+	struct path *parent_path, left_path;
 	struct qstr this;
 
 	parent = dget_parent(dentry);
@@ -279,7 +279,23 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 		/* also skip it if the parent isn't a directory. */
 		if (!S_ISDIR(lower_dir_dentry->d_inode->i_mode))
 			continue; /* XXX: should be BUG_ON */
-		//TODO: Handle whiteout
+
+		/* check for whiteouts: stop lookup if found */
+		if(i == 0) {
+			UDBG;
+			wh_lower_dentry = lookup_whiteout(name, lower_dir_dentry);
+			if (IS_ERR(wh_lower_dentry)) {
+				err = PTR_ERR(wh_lower_dentry);
+				u2fs_put_reset_all_path(dentry);
+				goto out;
+			}
+			if (wh_lower_dentry->d_inode) {
+				dput(wh_lower_dentry);
+			UDBG;
+				break;
+			}
+			dput(wh_lower_dentry);
+		}
 
 		lower_dentry = __lookup_one(lower_dir_dentry, lower_dir_mnt, name, &lower_mnt);
 
@@ -300,22 +316,15 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 		if (!lower_dentry->d_inode)
 			continue;
 
-		//TODO: What is opaque??
 
-		/* update parent directory's atime with the bindex */
-		fsstack_copy_attr_atime(parent->d_inode,
-				lower_dir_dentry->d_inode);
-		if(!valid_path)
-			valid_path = u2fs_get_path(lower_dentry, i);
-		if(!valid_d)
-			valid_d = lower_dentry;
+		valid_detry_found = true;
 	}
 
 	//Do we need to remove negative dentry??
-	if(valid_d) {
+	if(valid_detry_found) {
 		//Found Dentry
 		UDBG;
-		err = u2fs_interpose(dentry, dentry->d_sb, valid_path);
+		err = u2fs_interpose(dentry, dentry->d_sb);
 		if (err) /* path_put underlying path on error */
 			u2fs_put_reset_all_path(dentry);
 

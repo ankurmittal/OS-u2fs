@@ -48,7 +48,7 @@ extern const struct super_operations u2fs_sops;
 extern const struct dentry_operations u2fs_dops;
 extern const struct address_space_operations u2fs_aops, u2fs_dummy_aops;
 extern const struct vm_operations_struct u2fs_vm_ops;
-
+extern struct dentry *lookup_whiteout(const char *name, struct dentry *lower_parent);
 extern int u2fs_init_inode_cache(void);
 extern void u2fs_destroy_inode_cache(void);
 extern int u2fs_init_dentry_cache(void);
@@ -59,8 +59,8 @@ extern struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 				    struct nameidata *nd);
 extern struct inode *u2fs_iget(struct super_block *sb,
 				 struct inode *lower_inode);
-extern int u2fs_interpose(struct dentry *dentry, struct super_block *sb,
-			    struct path *left_path);
+extern int u2fs_interpose(struct dentry *dentry, struct super_block *sb);
+
 
 /* file private data */
 struct u2fs_file_info {
