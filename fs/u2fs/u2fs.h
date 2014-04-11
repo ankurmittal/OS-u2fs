@@ -276,8 +276,8 @@ static inline void u2fs_reset_all_path(const struct dentry *dent)
 {
 	spin_lock(&U2FS_D(dent)->lock);
 	U2FS_D(dent)->left_path.dentry = NULL;
-	U2FS_D(dent)->left_path.dentry = NULL;
-	U2FS_D(dent)->right_path.mnt = NULL;
+	U2FS_D(dent)->right_path.dentry = NULL;
+	U2FS_D(dent)->left_path.mnt = NULL;
 	U2FS_D(dent)->right_path.mnt = NULL;
 	spin_unlock(&U2FS_D(dent)->lock);
 	return;
@@ -363,4 +363,5 @@ static inline void unlock_dir(struct dentry *dir)
 	mutex_unlock(&dir->d_inode->i_mutex);
 	dput(dir);
 }
+
 #endif	/* not _U2FS_H_ */
