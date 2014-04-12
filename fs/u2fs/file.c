@@ -80,7 +80,7 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	int index;
 
 	printk("Read Dir Called\n");
-	for(index = 1; index >=0; index--) {
+	for(index = 0; index < 2; index++) {
 		printk("lowerFile %d\n",index);
 		lower_file = u2fs_lower_file(file, index);
 		if(!lower_file)

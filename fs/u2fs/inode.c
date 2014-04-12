@@ -21,7 +21,7 @@ static int u2fs_create(struct inode *dir, struct dentry *dentry,
 
 	left_path = u2fs_get_path(dentry, 0);
 	lower_dentry = left_path->dentry;
-	lower_parent_dentry = lock_parent(lower_dentry);
+	lower_parent_dentry = u2fs_lock_parent(lower_dentry);
 
 	err = mnt_want_write(left_path->mnt);
 	if (err)
@@ -43,7 +43,7 @@ static int u2fs_create(struct inode *dir, struct dentry *dentry,
 out:
 	mnt_drop_write(left_path->mnt);
 out_unlock:
-	unlock_dir(lower_parent_dentry);
+	u2fs_unlock_parent(lower_dentry, lower_parent_dentry);
 	//u2fs_put_path(dentry, u2fs_put_path(dentry, left_path)left_path);
 	return err;
 }
