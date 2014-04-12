@@ -61,7 +61,7 @@ extern struct inode *u2fs_iget(struct super_block *sb,
 				 struct inode *lower_inode);
 extern int u2fs_interpose(struct dentry *dentry, struct super_block *sb);
 extern int create_whiteout(struct dentry *dentry);
-
+extern bool is_whiteout_name(char **namep, int *namelenp);
 
 /* file private data */
 struct u2fs_file_info {
@@ -90,6 +90,13 @@ struct u2fs_sb_info {
 	struct super_block *left_sb;
 	struct super_block *right_sb;
 };
+
+struct u2fs_getdents_buf {
+	void *dirent;
+	filldir_t filldir;
+};
+
+
 
 /*
  * inode to private data
