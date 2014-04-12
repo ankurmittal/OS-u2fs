@@ -1119,6 +1119,23 @@ process_signals (void)
     }
 }
 
+/*
+ * Wrapper Function for free_wrapper
+ */
+void free_wrapper(void *p)
+{
+ 	free(p);
+}
+
+/*
+ * Wrapper Function for hash_string
+ */
+static size_t hash_string_wrapper(const void *p, size_t table_size)
+{
+	return hash_string(p, table_size);
+}
+
+
 int
 main (int argc, char **argv)
 {
@@ -1248,9 +1265,9 @@ main (int argc, char **argv)
   files = xnmalloc (nfiles, sizeof *files);
   //Hack: creating file name hashtable
   file_name_set = hash_initialize (nfiles, NULL,
-					hash_string,
+					hash_string_wrapper,
 					dev_file_name_compare,
-					dev_ino_free);
+					free_wrapper);
   if (file_name_set == NULL)
 	xalloc_die ();
   files_index = 0;
@@ -1318,7 +1335,8 @@ main (int argc, char **argv)
       print_dir (thispend->name, thispend->realname,
 		 thispend->command_line_arg);
 
-      free_pending_ent (thispend);
+
+      //free_pending_ent (thispend);
       print_dir_name = true;
     }
 
@@ -2456,10 +2474,11 @@ static bool
 file_name_match (char *filename)
 {
 	/*Making a copy as filename is deallocated as parent function exists*/
-	char *newfileName = malloc(sizeof(char) * strlen(filename));
+	char *newfileName = malloc(sizeof(char) * strlen(filename) + 1);
 	if(newfileName == NULL)
 		xalloc_die();
 	strcpy(newfileName, filename);
+	newfileName[strlen(filename)] = 0;
 	/*If entry is found return old entry else returns passed entry*/
 	if(newfileName != hash_insert(file_name_set, newfileName))
 		return true;
