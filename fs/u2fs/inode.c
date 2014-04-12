@@ -94,46 +94,69 @@ out_unlock:
 
 static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 {
-	int err;
-	struct dentry *lower_dentry;
-	struct inode *lower_dir_inode = u2fs_lower_inode(dir);
+	int err, index = 1;
+	struct dentry *lower_dentry = NULL, *parent;
 	struct dentry *lower_dir_dentry;
-	struct path *left_path;
-printk("unlink\n");
-	left_path = u2fs_get_path(dentry, 0);
-	lower_dentry = left_path->dentry;
+	struct vfsmount *mnt;
+	bool is_right_valid = true;
+	parent = u2fs_lock_parent(dentry);
+	do {
+		lower_dentry = u2fs_get_lower_dentry(dentry, index);
+		mnt = u2fs_get_lower_mnt(dentry, index);
+		if(lower_dentry && lower_dentry->d_inode) {
+			if(index)
+				is_right_valid = true;
+			break;
+		}
+		index--;
+	} while(index >= 0);
+	UDBG;
+	if(!lower_dentry || !lower_dentry->d_inode) {
+		err = -ENOENT;
+		goto out_return;
+	}
+
+	UDBG;
 	dget(lower_dentry);
 		printk("Dentry Use: %p\n", lower_dentry);
-	lower_dir_dentry = lock_parent(lower_dentry);
+	lower_dir_dentry = u2fs_get_lower_dentry(parent, index);
 
-	err = mnt_want_write(left_path->mnt);
+	UDBG;
+	err = mnt_want_write(mnt);
 	if (err)
 		goto out_unlock;
-	err = vfs_unlink(lower_dir_inode, lower_dentry);
+	/*Delete File in left brach*/
+	UDBG;
+	if(!index)
+		err = vfs_unlink(lower_dir_dentry->d_inode, lower_dentry);
 
-	/*
-	 * Note: unlinking on top of NFS can cause silly-renamed files.
-	 * Trying to delete such files results in EBUSY from NFS
-	 * below.  Silly-renamed files will get deleted by NFS later on, so
-	 * we just need to detect them here and treat such EBUSY errors as
-	 * if the upper file was successfully deleted.
-	 */
-	if (err == -EBUSY && lower_dentry->d_flags & DCACHE_NFSFS_RENAMED)
-		err = 0;
+	UDBG;
 	if (err)
 		goto out;
-	fsstack_copy_attr_times(dir, lower_dir_inode);
-	fsstack_copy_inode_size(dir, lower_dir_inode);
-	set_nlink(dentry->d_inode,
-		  u2fs_lower_inode(dentry->d_inode)->i_nlink);
-	dentry->d_inode->i_ctime = dir->i_ctime;
+	if(is_right_valid)
+		err = create_whiteout(dentry);
+	if(!err)
+		inode_dec_link_count(dentry->d_inode);
+	//fsstack_copy_attr_times(dir, lower_dir_inode);
+	//fsstack_copy_inode_size(dir, lower_dir_inode);
+	//set_nlink(dentry->d_inode,
+	//	  u2fs_lower_inode(dentry->d_inode)->i_nlink);
+	//dentry->d_inode->i_ctime = dir->i_ctime;
+
 	d_drop(dentry); /* this is needed, else LTP fails (VFS won't do it) */
+	UDBG;
 out:
-	mnt_drop_write(left_path->mnt);
+	mnt_drop_write(mnt);
+	UDBG;
 out_unlock:
 	unlock_dir(lower_dir_dentry);
+	UDBG;
 	dput(lower_dentry);
+	UDBG;
 //	u2fs_put_path(dentry, left_path);
+out_return:
+	u2fs_unlock_parent(dentry, parent);
+	UDBG;
 	return err;
 }
 

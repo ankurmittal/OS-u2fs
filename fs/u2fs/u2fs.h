@@ -60,6 +60,7 @@ extern struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 extern struct inode *u2fs_iget(struct super_block *sb,
 				 struct inode *lower_inode);
 extern int u2fs_interpose(struct dentry *dentry, struct super_block *sb);
+extern int create_whiteout(struct dentry *dentry);
 
 
 /* file private data */
