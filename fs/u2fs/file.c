@@ -10,7 +10,7 @@
  */
 
 #include "u2fs.h"
-
+#define FILLDIR_SIZE 100
 static ssize_t u2fs_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
@@ -80,31 +80,22 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 	int err = 0;
 	int is_whiteout;
 	char *name = (char *) oname;
-
+	struct filldir_node *found = NULL;
 	//buf->filldir_called++;
+
 
 	is_whiteout = is_whiteout_name(&name, &namelen);
 
-	//found = find_filldir_node(buf->rdstate, name, namelen, is_whiteout);
-	if (is_whiteout)
-		goto out;
 
-	#if 0
-	if (found) {
-		/*
-		 * If we had non-whiteout entry in dir cache, then mark it
-		 * as a whiteout and but leave it in the dir cache.
-		 */
-		if (is_whiteout && !found->whiteout)
-			found->whiteout = is_whiteout;
-		goto out;
-	}
-	#endif
 
 	/* if 'name' isn't a whiteout, filldir it. */
 	if (!is_whiteout) {
+		/* Find Deleted Entry */
+		if (buf->is_right)
+			found = find_filldir_node(name, namelen, buf->heads, buf->heads_size);
+		if(found)
+			goto out;
 		//off_t pos = rdstate2offset(buf->rdstate);
-		//u64 u2fs_ino = ino;
 
 		/* Check how to send pos ? */
 		err = buf->filldir(buf->dirent, name, namelen, offset,
@@ -112,6 +103,7 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 		//buf->rdstate->offset++;
 		//verify_rdstate_offset(buf->rdstate);
 	}
+
 
 	#if 0
 	/*
@@ -122,9 +114,13 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 		buf->filldir_error = err;
 		goto out;
 	}
+
 	buf->entries_written++;
-	err = add_filldir_node(buf->rdstate, name, namelen,
-		buf->rdstate->bindex, is_whiteout);
+	#endif
+	if (!err && (is_whiteout && !buf->is_right))
+		err = add_filldir_node(name, namelen,
+			is_whiteout, buf->heads, buf->heads_size);
+	#if 0
 	if (err)
 		buf->filldir_error = err;
 
@@ -136,18 +132,24 @@ out:
 
 static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 {
-	int err = 0;
 	struct file *lower_file = NULL;
 	struct dentry *dentry = file->f_path.dentry;
+	struct list_head filldir_heads[FILLDIR_SIZE];
 	int index;
+	int err = 0;
+
 
 	struct u2fs_getdents_buf buf;
+	init_filldir_heads(filldir_heads, FILLDIR_SIZE);
 	printk("Read Dir Called\n");
 
 	buf.dirent = dirent;
 	buf.filldir = filldir;
+	buf.heads = filldir_heads;
+	buf.heads_size = FILLDIR_SIZE;
 
 	for(index = 0; index < 2; index++) {
+		buf.is_right = (index == 1);
 		printk("lowerFile %d\n",index);
 		lower_file = u2fs_lower_file(file, index);
 		if(!lower_file)
@@ -159,6 +161,7 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 					lower_file->f_path.dentry->d_inode);
 		else break;
 	}
+	free_filldir_heads(filldir_heads, FILLDIR_SIZE);
 	return err;
 }
 

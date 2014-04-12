@@ -328,14 +328,20 @@ static int __init init_u2fs_fs(void)
 {
 	int err;
 
-	pr_info("Registering u2fs Ankur" U2FS_VERSION "\n");
+	pr_info("Registering u2fs" U2FS_VERSION "\n");
+
+	err = u2fs_init_filldir_cache();
+	if (unlikely(err))
+		goto out;
 
 	err = u2fs_init_inode_cache();
 	if (err)
 		goto out;
+
 	err = u2fs_init_dentry_cache();
 	if (err)
 		goto out;
+
 	err = register_filesystem(&u2fs_fs_type);
 out:
 	if (err) {
@@ -347,6 +353,7 @@ out:
 
 static void __exit exit_u2fs_fs(void)
 {
+	u2fs_destroy_filldir_cache();
 	u2fs_destroy_inode_cache();
 	u2fs_destroy_dentry_cache();
 	unregister_filesystem(&u2fs_fs_type);

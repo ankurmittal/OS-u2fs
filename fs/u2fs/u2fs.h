@@ -63,6 +63,15 @@ extern int u2fs_interpose(struct dentry *dentry, struct super_block *sb);
 extern int create_whiteout(struct dentry *dentry);
 extern bool is_whiteout_name(char **namep, int *namelenp);
 
+extern int u2fs_init_filldir_cache(void);
+extern void u2fs_destroy_filldir_cache(void);
+
+extern struct filldir_node *find_filldir_node(const char *name, int namelen,
+		struct list_head *heads, int head_list_size);
+extern int add_filldir_node(const char *name, int namelen, int whiteout,
+			struct list_head *heads, int head_list_size);
+extern void free_filldir_heads(struct list_head *heads, int head_list_size);
+
 /* file private data */
 struct u2fs_file_info {
 	struct file *right_file;
@@ -94,10 +103,41 @@ struct u2fs_sb_info {
 struct u2fs_getdents_buf {
 	void *dirent;
 	filldir_t filldir;
+	bool is_right;
+	struct list_head *heads;
+	int heads_size;
+
 };
 
+/*
+ * structure for making the linked list of entries by readdir on left branch
+ * to compare with entries on right branch
+ */
+struct filldir_node {
+	struct list_head file_list;     /* list for directory entries */
+	char *name;             /* name entry */
+	int hash;               /* name hash */
+	int namelen;            /* name len since name is not 0 terminated */
 
+	/*
+	 * we can check for duplicate whiteouts and files in the same branch
+	 * in order to return -EIO.
+	 */
+	//int bindex;
 
+	/* is this a whiteout entry? */
+	int whiteout;
+
+	/* Inline name, so we don't need to separately kmalloc small ones */
+	char iname[DNAME_INLINE_LEN];
+};
+
+static inline void init_filldir_heads(struct list_head *heads, int head_list_size)
+{
+	int i;
+	for (i = 0; i < head_list_size; i++)
+		INIT_LIST_HEAD(&heads[i]);
+}
 /*
  * inode to private data
  *
@@ -165,19 +205,19 @@ static inline void u2fs_set_lower_inode(struct inode *i, struct inode *val)
 
 /* superblock to lower superblock */
 static inline struct super_block *u2fs_lower_super(
-	const struct super_block *sb)
+		const struct super_block *sb)
 {
 	return U2FS_SB(sb)->left_sb;
 }
 
 static inline void u2fs_set_right_super(struct super_block *sb,
-					  struct super_block *val)
+		struct super_block *val)
 {
 	U2FS_SB(sb)->right_sb = val;
 }
 
 static inline void u2fs_set_left_super(struct super_block *sb,
-					  struct super_block *val)
+		struct super_block *val)
 {
 	U2FS_SB(sb)->left_sb = val;
 }
@@ -215,7 +255,7 @@ static inline void u2fs_put_all_paths(const struct dentry *dent)
 
 
 static inline void u2fs_set_right_path(const struct dentry *dent,
-					 struct path *right_path)
+		struct path *right_path)
 {
 	spin_lock(&U2FS_D(dent)->lock);
 	pathcpy(&U2FS_D(dent)->right_path, right_path);
@@ -342,7 +382,7 @@ static inline struct dentry *u2fs_lock_parent(struct dentry *d)
 /* The root directory is unhashed, but isn't deleted. */
 static inline int d_deleted(struct dentry *d)
 {
-        return d_unhashed(d) && (d != d->d_sb->s_root);
+	return d_unhashed(d) && (d != d->d_sb->s_root);
 }
 
 
@@ -352,9 +392,9 @@ static inline void u2fs_unlock_parent(struct dentry *d, struct dentry *p)
 	BUG_ON(!p);
 	//TODO
 	/*if (p != d) {
-		BUG_ON(!mutex_is_locked(&U2FS_D(p)->lock));
-		mutex_unlock(&U2FS_D(p)->lock);
-	}*/
+	  BUG_ON(!mutex_is_locked(&U2FS_D(p)->lock));
+	  mutex_unlock(&U2FS_D(p)->lock);
+	  }*/
 	dput(p);
 }
 
