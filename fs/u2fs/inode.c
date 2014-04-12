@@ -94,19 +94,23 @@ out_unlock:
 
 static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 {
-	int err, index = 1;
-	struct dentry *lower_dentry = NULL, *parent;
+	struct dentry *lower_dentry = NULL, *parent, *dent_temp;
 	struct dentry *lower_dir_dentry;
-	struct vfsmount *mnt;
-	bool is_right_valid = true;
+	struct vfsmount *mnt = NULL, *mnt_temp;
+	int err, index = 1;
+	bool is_right_valid = false, is_left_valid = false;
+	printk("Unlink File: %s", dentry->d_name.name);
 	parent = u2fs_lock_parent(dentry);
 	do {
-		lower_dentry = u2fs_get_lower_dentry(dentry, index);
-		mnt = u2fs_get_lower_mnt(dentry, index);
-		if(lower_dentry && lower_dentry->d_inode) {
+		dent_temp = u2fs_get_lower_dentry(dentry, index);
+		mnt_temp = u2fs_get_lower_mnt(dentry, index);
+		if(dent_temp && dent_temp->d_inode) {
 			if(index)
 				is_right_valid = true;
-			break;
+			else
+				is_left_valid = true;
+			lower_dentry = dent_temp;
+			mnt = mnt_temp;
 		}
 		index--;
 	} while(index >= 0);
@@ -119,7 +123,7 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 	UDBG;
 	dget(lower_dentry);
 		printk("Dentry Use: %p\n", lower_dentry);
-	lower_dir_dentry = u2fs_get_lower_dentry(parent, index);
+	lower_dir_dentry = u2fs_get_lower_dentry(parent, is_left_valid?0:1);
 
 	UDBG;
 	err = mnt_want_write(mnt);
@@ -127,7 +131,7 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 		goto out_unlock;
 	/*Delete File in left brach*/
 	UDBG;
-	if(!index)
+	if(is_left_valid)
 		err = vfs_unlink(lower_dir_dentry->d_inode, lower_dentry);
 
 	UDBG;

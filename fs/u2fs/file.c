@@ -211,7 +211,7 @@ static int __open_dir(struct inode *inode, struct file *file,
 	for (index = 0; index < 2; index++) {
 		lower_dentry =
 			u2fs_get_lower_dentry(dentry, index);
-		if (!lower_dentry)
+		if (!lower_dentry || !lower_dentry->d_inode)
 			continue;
 
 		dget(lower_dentry);
