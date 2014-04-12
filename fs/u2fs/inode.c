@@ -131,8 +131,13 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 		goto out_unlock;
 	/*Delete File in left brach*/
 	UDBG;
-	if(is_left_valid)
-		err = vfs_unlink(lower_dir_dentry->d_inode, lower_dentry);
+	if(is_left_valid) {
+		if(!S_ISDIR(lower_dentry->d_inode->i_mode))
+			err = vfs_unlink(lower_dir_dentry->d_inode, lower_dentry);
+		else
+			err = vfs_rmdir(lower_dir_dentry->d_inode, lower_dentry);
+
+	}
 
 	UDBG;
 	if (err)
@@ -230,7 +235,7 @@ out_unlock:
 	u2fs_put_path(dentry, left_path);
 	return err;
 }
-
+#if 0
 static int u2fs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	struct dentry *lower_dentry;
@@ -263,6 +268,7 @@ out_unlock:
 //	u2fs_put_path(dentry, left_path);
 	return err;
 }
+#endif
 
 static int u2fs_mknod(struct inode *dir, struct dentry *dentry, int mode,
 			dev_t dev)
@@ -458,9 +464,16 @@ static int u2fs_setattr(struct dentry *dentry, struct iattr *ia)
 	if (err)
 		goto out_err;
 
-	left_path = u2fs_get_path(dentry, 0);
-	lower_dentry = left_path->dentry;
-	lower_inode = u2fs_lower_inode(inode);
+
+	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
+
+	/*TODO : COPYUP*/
+	if(!lower_dentry || !lower_dentry->d_inode) {
+		err = -EPERM;
+		goto out_err;
+	}
+
+	lower_inode = lower_dentry->d_inode;
 
 	/* prepare our own lower struct iattr (with the lower file) */
 	memcpy(&lower_ia, ia, sizeof(lower_ia));
@@ -530,7 +543,7 @@ const struct inode_operations u2fs_dir_iops = {
 	.unlink		= u2fs_unlink,
 	.symlink	= u2fs_symlink,
 	.mkdir		= u2fs_mkdir,
-	.rmdir		= u2fs_rmdir,
+	.rmdir		= u2fs_unlink,
 	.mknod		= u2fs_mknod,
 	.rename		= u2fs_rename,
 	.permission	= u2fs_permission,
