@@ -277,6 +277,7 @@ static int __open_file(struct inode *inode, struct file *file,
 			  copyup the file
 			  err = copyup_file(parent->d_inode, file, size);
 			  return err;*/
+			  return -EPERM;
 		} else {
 			/*
 			 * turn off writeable flags, to force delayed copyup
@@ -288,7 +289,6 @@ static int __open_file(struct inode *inode, struct file *file,
 
 	dget(lower_dentry);
 
-	printk("Dentry Use: %p\n", lower_dentry);
 	/*
 	 * dentry_open will decrement mnt refcnt if err.
 	 * otherwise fput() will do an mntput() for us upon file close.
