@@ -252,29 +252,51 @@ static int u2fs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 	left_path = u2fs_get_path(dentry, 0);
 	lower_dentry = left_path->dentry;
-	lower_parent_dentry = lock_parent(lower_dentry);
 
 	err = mnt_want_write(left_path->mnt);
 	if (err)
-		goto out_unlock;
+		goto out;
+
+	if (has_valid_parent(lower_dentry))
+		err = check_unlink_whiteout(dentry, lower_dentry);
+	if (err > 0)    /* ignore if whiteout found and removed */
+		err = 0;
+	if (err && err != -EROFS)
+		goto out_mnt;
+	/*
+	 * If we get here, then check if copyup needed.  If lower_dentry is
+	 * NULL, create the entire dentry directory structure in branch 0.
+	 */
+	if(!has_valid_parent(lower_dentry)) {
+		lower_dentry = create_parents(dir, dentry,
+				dentry->d_name.name);
+		if (IS_ERR(lower_dentry)) {
+			err = PTR_ERR(lower_dentry);
+			goto out_mnt;
+		}
+	}
+
+	lower_parent_dentry = lock_parent(lower_dentry);
+
 	err = vfs_mkdir(lower_parent_dentry->d_inode, lower_dentry, mode);
 	if (err)
-		goto out;
+		goto out_unlock;
 
 	err = u2fs_interpose(dentry, dir->i_sb);
 	if (err)
-		goto out;
+		goto out_unlock;
 
 	fsstack_copy_attr_times(dir, u2fs_lower_inode(dir));
 	fsstack_copy_inode_size(dir, lower_parent_dentry->d_inode);
 	/* update number of links on parent directory */
-	set_nlink(dir, u2fs_lower_inode(dir)->i_nlink);
 
-out:
-	mnt_drop_write(left_path->mnt);
+//	set_nlink(dir, u2fs_lower_inode(dir)->i_nlink);
+
 out_unlock:
 	unlock_dir(lower_parent_dentry);
-	u2fs_put_path(dentry, left_path);
+out_mnt:
+	mnt_drop_write(left_path->mnt);
+out:
 	return err;
 }
 #if 0
