@@ -18,13 +18,13 @@
 #define DUP_ELIM false
 #endif
 static ssize_t u2fs_read(struct file *file, char __user *buf,
-			   size_t count, loff_t *ppos)
+		size_t count, loff_t *ppos)
 {
 	int err = -ENOENT, i;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
 	UDBG;
- 	for(i=0; i < 2; i++) {
+	for (i = 0; i < 2; i++) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, i);
 		if (!lower_dentry || !lower_dentry->d_inode)
 			continue;
@@ -55,8 +55,8 @@ static ssize_t u2fs_write(struct file *file, const char __user *buf,
 	//	goto out;
 	UDBG;
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
-		if (!lower_dentry || !lower_dentry->d_inode)
-			return err;
+	if (!lower_dentry || !lower_dentry->d_inode)
+		return err;
 	lower_file = u2fs_lower_file(file, 0);
 	err = vfs_write(lower_file, buf, count, ppos);
 
@@ -67,7 +67,7 @@ static ssize_t u2fs_write(struct file *file, const char __user *buf,
 		fsstack_copy_attr_times(dentry->d_inode,
 				lower_file->f_path.dentry->d_inode);
 		U2FS_F(file)->wrote_to_file = true; /* for delayed copyup */
-	//	u2fs_check_file(file);
+		//	u2fs_check_file(file);
 	}
 
 	//u2fs_unlock_dentry(dentry);
@@ -77,7 +77,7 @@ static ssize_t u2fs_write(struct file *file, const char __user *buf,
 
 /* Taken from u2fs. based on generic filldir in fs/readir.c */
 static int u2fs_filldir(void *dirent, const char *oname, int namelen,
-                           loff_t offset, u64 ino, unsigned int d_type)
+		loff_t offset, u64 ino, unsigned int d_type)
 {
 	struct u2fs_getdents_buf *buf = dirent;
 	//struct filldir_node *found = NULL;
@@ -96,19 +96,19 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 		/* Find Deleted Entry */
 		if (buf->is_right)
 			found = find_filldir_node(name, namelen, buf->heads, buf->heads_size);
-		if(found)
+		if (found)
 			goto out;
 		//off_t pos = rdstate2offset(buf->rdstate);
 
 		/* Check how to send pos ? */
 		err = buf->filldir(buf->dirent, name, namelen, offset,
-					ino, d_type);
+				ino, d_type);
 		//buf->rdstate->offset++;
 		//verify_rdstate_offset(buf->rdstate);
 	}
 
 
-	#if 0
+#if 0
 	/*
 	 * If we did fill it, stuff it in our hash, otherwise return an
 	 * error.
@@ -119,15 +119,15 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 	}
 
 	buf->entries_written++;
-	#endif
+#endif
 	if (!err && ((DUP_ELIM || is_whiteout) && !buf->is_right))
 		err = add_filldir_node(name, namelen,
-			is_whiteout, buf->heads, buf->heads_size);
-	#if 0
+				is_whiteout, buf->heads, buf->heads_size);
+#if 0
 	if (err)
 		buf->filldir_error = err;
 
-	#endif
+#endif
 
 out:
 	return err;
@@ -151,11 +151,11 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	buf.heads = filldir_heads;
 	buf.heads_size = FILLDIR_SIZE;
 
-	for(index = 0; index < 2; index++) {
+	for (index = 0; index < 2; index++) {
 		buf.is_right = (index == 1);
 		printk("lowerFile %d\n",index);
 		lower_file = u2fs_lower_file(file, index);
-		if(!lower_file)
+		if (!lower_file)
 			continue;
 		err = vfs_readdir(lower_file, u2fs_filldir, &buf);
 		file->f_pos = lower_file->f_pos;
@@ -164,7 +164,7 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 					lower_file->f_path.dentry->d_inode);
 		else break;
 	}
-	if(!err)
+	if (!err)
 		file->f_pos = DIREOF;
 	free_filldir_heads(filldir_heads, FILLDIR_SIZE);
 	return err;
@@ -280,9 +280,6 @@ static int __open_dir(struct inode *inode, struct file *file,
 	struct vfsmount *lower_mnt;
 	struct dentry *dentry = file->f_path.dentry;
 	int index;
-	printk("Dentry Use: %p\n", dentry);
-	printk("Dentry Count %d\n", dentry->d_count);
-	printk("Open Directory\n");
 	for (index = 0; index < 2; index++) {
 		lower_dentry =
 			u2fs_get_lower_dentry(dentry, index);
@@ -290,7 +287,6 @@ static int __open_dir(struct inode *inode, struct file *file,
 			continue;
 
 		dget(lower_dentry);
-		printk("Dentry Use:%s,%s, %p\n",lower_dentry->d_name.name, dentry->d_name.name, lower_dentry);
 		lower_mnt = u2fs_mntget(dentry, index);
 		if (!lower_mnt)
 			lower_mnt = u2fs_mntget(parent, index);
@@ -327,7 +323,7 @@ static int __open_file(struct inode *inode, struct file *file,
 
 	printk("Open File: %s\n", dentry->d_name.name);
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
-	if(!lower_dentry || !lower_dentry->d_inode) {
+	if (!lower_dentry || !lower_dentry->d_inode) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, 1);
 		bIndex = 1;
 	}
@@ -350,7 +346,7 @@ static int __open_file(struct inode *inode, struct file *file,
 			UDBG;
 			err = copyup_file(parent->d_inode, file, size);
 			UDBG;
-			if(err)
+			if (err)
 				return err;
 			lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 			bIndex = 0;
@@ -389,8 +385,6 @@ int u2fs_open(struct inode *inode, struct file *file)
 	parent = u2fs_lock_parent(dentry);
 	//u2fs_lock_dentry(dentry, U2FS_DMUTEX_CHILD);
 
-	printk("Dentry Count %d\n", dentry->d_count);
-	printk("Parent Count %d\n", parent->d_count);
 	/* don't open unhashed/deleted files */
 	if (d_deleted(dentry)) {
 		err = -ENOENT;
@@ -457,9 +451,7 @@ static int u2fs_file_release(struct inode *inode, struct file *file)
 	struct dentry *lower_dentry;
 	struct dentry *dentry = file->f_path.dentry;
 	int index;
-	printk("Dentry Address %p\n", dentry);
-	printk("Dentry Count %d\n", dentry->d_count);
-	for(index = 0; index < 2; index++){
+	for (index = 0; index < 2; index++) {
 
 		lower_file = u2fs_lower_file(file, index);
 		if (lower_file) {
@@ -473,7 +465,7 @@ static int u2fs_file_release(struct inode *inode, struct file *file)
 			continue;
 		printk("Dentry put %p\n", lower_dentry);
 		//TODO: Check for all references
-		if(d_deleted(lower_dentry)) {
+		if (d_deleted(lower_dentry)) {
 			dput(lower_dentry);
 			u2fs_set_lower_dentry(dentry, index, NULL);
 		}
@@ -500,7 +492,7 @@ static int u2fs_fsync(struct file *file, loff_t start, loff_t end,
 	if (err)
 		goto out;
 	err = -ENOENT;
-	for(i=0; i < 2; i++) {
+	for (i = 0; i < 2; i++) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, i);
 		if (!lower_dentry || !lower_dentry->d_inode)
 			continue;
@@ -519,7 +511,7 @@ static int u2fs_fasync(int fd, struct file *file, int flag)
 	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
 	err = -ENOENT;
 	UDBG;
-	for(i=0; i < 2; i++) {
+	for (i = 0; i < 2; i++) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, i);
 		if (!lower_dentry || !lower_dentry->d_inode)
 			continue;

@@ -80,22 +80,23 @@ static int __copyup_ndentry(struct dentry *old_lower_dentry,
 	umode_t old_mode = old_lower_dentry->d_inode->i_mode;
 
 	if (S_ISDIR(old_mode))
-		err = vfs_mkdir(new_lower_parent_dentry->d_inode, new_lower_dentry, old_mode);
+		err = vfs_mkdir(new_lower_parent_dentry->d_inode,
+			new_lower_dentry, old_mode);
 	else if (S_ISLNK(old_mode))
-		err = vfs_symlink(new_lower_parent_dentry->d_inode, new_lower_dentry, symbuf);
+		err = vfs_symlink(new_lower_parent_dentry->d_inode,
+				new_lower_dentry, symbuf);
 	else if (S_ISBLK(old_mode) || S_ISCHR(old_mode) ||
-		   S_ISFIFO(old_mode) || S_ISSOCK(old_mode))
+			S_ISFIFO(old_mode) || S_ISSOCK(old_mode))
 		err = vfs_mknod(new_lower_parent_dentry->d_inode,
 				new_lower_dentry, old_mode,
 				old_lower_dentry->d_inode->i_rdev);
 
-	else if (S_ISREG(old_mode)) {
-		//struct nameidata nd;
-		//err = init_lower_nd(&nd, LOOKUP_CREATE);
-		err = vfs_create(new_lower_parent_dentry->d_inode, new_lower_dentry, old_mode, NULL);
-	} else {
+	else if (S_ISREG(old_mode))
+		err = vfs_create(new_lower_parent_dentry->d_inode,
+				new_lower_dentry, old_mode, NULL);
+	else {
 		printk(KERN_CRIT "u2fs: unknown inode type %d\n",
-		       old_mode);
+				old_mode);
 		BUG();
 	}
 
@@ -103,9 +104,9 @@ static int __copyup_ndentry(struct dentry *old_lower_dentry,
 }
 
 static int __copyup_reg_data(struct dentry *dentry,
-			     struct dentry *new_lower_dentry,
-			     struct dentry *old_lower_dentry,
-			     struct file **copyup_file, loff_t len)
+		struct dentry *new_lower_dentry,
+		struct dentry *old_lower_dentry,
+		struct file **copyup_file, loff_t len)
 {
 	struct super_block *sb = dentry->d_sb;
 	struct file *input_file;
@@ -121,8 +122,8 @@ static int __copyup_reg_data(struct dentry *dentry,
 	u2fs_mntget(dentry, 1);
 	/* dentry_open calls dput and mntput if it returns an error */
 	input_file = dentry_open(old_lower_dentry,
-				 u2fs_get_lower_mnt(dentry, 1),
-				 O_RDONLY | O_LARGEFILE, current_cred());
+			u2fs_get_lower_mnt(dentry, 1),
+			O_RDONLY | O_LARGEFILE, current_cred());
 	if (IS_ERR(input_file)) {
 		dput(old_lower_dentry);
 		err = PTR_ERR(input_file);
@@ -138,7 +139,7 @@ static int __copyup_reg_data(struct dentry *dentry,
 	output_mnt = u2fs_mntget(sb->s_root, 0);
 
 	output_file = dentry_open(new_lower_dentry, output_mnt,
-				  O_RDWR | O_LARGEFILE, current_cred());
+			O_RDWR | O_LARGEFILE, current_cred());
 	if (IS_ERR(output_file)) {
 		err = PTR_ERR(output_file);
 		goto out_close_in;
@@ -173,8 +174,8 @@ static int __copyup_reg_data(struct dentry *dentry,
 
 		read_bytes =
 			input_file->f_op->read(input_file,
-					       (char __user *)buf, size,
-					       &input_file->f_pos);
+					(char __user *)buf, size,
+					&input_file->f_pos);
 		if (read_bytes <= 0) {
 			err = read_bytes;
 			break;
@@ -183,9 +184,9 @@ static int __copyup_reg_data(struct dentry *dentry,
 		lockdep_off();
 		write_bytes =
 			output_file->f_op->write(output_file,
-						 (char __user *)buf,
-						 read_bytes,
-						 &output_file->f_pos);
+					(char __user *)buf,
+					read_bytes,
+					&output_file->f_pos);
 		lockdep_on();
 		if ((write_bytes < 0) || (write_bytes < read_bytes)) {
 			err = write_bytes;
@@ -220,7 +221,7 @@ out:
  * pointer
  */
 static void __clear(struct dentry *dentry, struct dentry *old_lower_dentry,
-		    struct dentry *new_lower_dentry)
+		struct dentry *new_lower_dentry)
 {
 	/* get rid of the lower dentry and all its traces */
 	UDBG;
@@ -239,8 +240,9 @@ static void __clear(struct dentry *dentry, struct dentry *old_lower_dentry,
  * @copyup_file: the "struct file" to return (optional)
  * @len: how many bytes to copy-up?
  */
-int copyup_dentry(struct inode *dir, struct dentry *dentry, const char *name, int namelen,
-		  struct file **copyup_file, loff_t len)
+int copyup_dentry(struct inode *dir, struct dentry *dentry,
+const char *name, int namelen,
+		struct file **copyup_file, loff_t len)
 {
 	struct dentry *new_lower_dentry;
 	struct dentry *old_lower_dentry = NULL;
@@ -271,7 +273,7 @@ int copyup_dentry(struct inode *dir, struct dentry *dentry, const char *name, in
 		symbuf = kmalloc(PATH_MAX, GFP_KERNEL);
 		if (unlikely(!symbuf)) {
 			__clear(dentry, old_lower_dentry,
-				new_lower_dentry);
+					new_lower_dentry);
 			err = -ENOMEM;
 			goto out_free;
 		}
@@ -279,13 +281,13 @@ int copyup_dentry(struct inode *dir, struct dentry *dentry, const char *name, in
 		oldfs = get_fs();
 		set_fs(KERNEL_DS);
 		err = old_lower_dentry->d_inode->i_op->readlink(
-			old_lower_dentry,
-			(char __user *)symbuf,
-			PATH_MAX);
+				old_lower_dentry,
+				(char __user *)symbuf,
+				PATH_MAX);
 		set_fs(oldfs);
 		if (err < 0) {
 			__clear(dentry, old_lower_dentry,
-				new_lower_dentry);
+					new_lower_dentry);
 			goto out_free;
 		}
 		symbuf[err] = '\0';
@@ -296,19 +298,19 @@ int copyup_dentry(struct inode *dir, struct dentry *dentry, const char *name, in
 
 	/* create the new inode */
 	err = __copyup_ndentry(old_lower_dentry, new_lower_dentry,
-			       new_lower_parent_dentry, symbuf);
+			new_lower_parent_dentry, symbuf);
 
 	if (err) {
 		__clear(dentry, old_lower_dentry,
-			new_lower_dentry);
+				new_lower_dentry);
 		goto out_unlock;
 	}
 
 	/* We actually copyup the file here. */
 	if (S_ISREG(old_lower_dentry->d_inode->i_mode))
 		err = __copyup_reg_data(dentry, new_lower_dentry,
-					old_lower_dentry,
-					copyup_file, len);
+				old_lower_dentry,
+				copyup_file, len);
 	if (err)
 		goto out_unlink;
 
@@ -319,7 +321,7 @@ int copyup_dentry(struct inode *dir, struct dentry *dentry, const char *name, in
 
 	/* do not allow files getting deleted to be re-interposed */
 	/* Req?? if (!d_deleted(dentry))
-		u2fs_reinterpose(dentry);*/
+	   u2fs_reinterpose(dentry);*/
 
 	goto out_unlock;
 
@@ -353,7 +355,7 @@ out_free:
 	 * functions we call above which operate on regular files.
 	 */
 	if (old_lower_dentry && old_lower_dentry->d_inode &&
-	    !S_ISREG(old_lower_dentry->d_inode->i_mode))
+			!S_ISREG(old_lower_dentry->d_inode->i_mode))
 		dput(old_lower_dentry);
 	kfree(symbuf);
 
@@ -363,7 +365,7 @@ out_free:
 		 * if directory creation succeeded, but inode copyup failed,
 		 * then purge new dentries.
 		 */
-			__clear(dentry, NULL,
+		__clear(dentry, NULL,
 				new_lower_dentry);
 		goto out;
 	}
@@ -391,16 +393,15 @@ out:
  * The copy will be named "name".
  */
 int copyup_named_file(struct inode *dir, struct file *file, char *name,
-		      int bstart, int new_bindex, loff_t len)
+		int bstart, int new_bindex, loff_t len)
 {
 	int err = 0;
 	struct file *output_file = NULL;
 
 	err = copyup_dentry(dir, file->f_path.dentry,
-			    name, strlen(name), &output_file, len);
-	if (!err) {
+			name, strlen(name), &output_file, len);
+	if (!err)
 		u2fs_set_lower_file(file, 0, output_file);
-	}
 
 	return err;
 }
@@ -414,11 +415,10 @@ int copyup_file(struct inode *dir, struct file *file, loff_t len)
 	struct file *output_file = NULL;
 	struct dentry *dentry = file->f_path.dentry;
 
-	err = copyup_dentry(dir, dentry,dentry->d_name.name, dentry->d_name.len,
-			    &output_file, len);
-	if (!err) {
+	err = copyup_dentry(dir, dentry, dentry->d_name.name,
+	dentry->d_name.len, &output_file, len);
+	if (!err)
 		u2fs_set_lower_file(file, 0, output_file);
-	}
 
 	return err;
 }
@@ -427,7 +427,7 @@ int copyup_file(struct inode *dir, struct file *file, loff_t len)
  * This function replicates the directory structure up-to given dentry
  */
 struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
-			      const char *name)
+		const char *name)
 {
 	int err;
 	struct dentry *child_dentry;
@@ -483,7 +483,7 @@ struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
 
 			nr_dentry *= 2;
 			p = krealloc(path, nr_dentry * sizeof(struct dentry *),
-				     GFP_KERNEL);
+					GFP_KERNEL);
 			if (unlikely(!p)) {
 				lower_dentry = ERR_PTR(-ENOMEM);
 				goto out;
@@ -515,7 +515,7 @@ begin:
 	if (child_dentry != dentry) {
 		/* lookup child in the underlying file system */
 		lower_dentry = lookup_lck_len(childname, lower_parent_dentry,
-					      childnamelen);
+				childnamelen);
 		if (IS_ERR(lower_dentry))
 			goto out;
 	} else {
@@ -524,14 +524,14 @@ begin:
 		 * whiteout child in the underlying file system
 		 */
 		lower_dentry = lookup_lck_len(name, lower_parent_dentry,
-					      strlen(name));
+				strlen(name));
 		if (IS_ERR(lower_dentry))
 			goto out;
 
 		/* Replace the current dentry (if any) with the new one */
 		dput(u2fs_get_lower_dentry(dentry, bindex));
 		u2fs_set_lower_dentry(dentry, bindex,
-					     lower_dentry);
+				lower_dentry);
 
 		goto out;
 	}
@@ -547,11 +547,12 @@ begin:
 		/* it's a negative dentry, create a new dir */
 		lower_parent_dentry = lock_parent(lower_dentry);
 
-		err = vfs_mkdir(lower_parent_dentry->d_inode, lower_dentry, child_dentry->d_inode->i_mode);
+		err = vfs_mkdir(lower_parent_dentry->d_inode,
+				lower_dentry, child_dentry->d_inode->i_mode);
 
 		if (!err)
 			err = copyup_permissions(dir->i_sb, child_dentry,
-						 lower_dentry);
+					lower_dentry);
 		unlock_dir(lower_parent_dentry);
 		if (err) {
 			dput(lower_dentry);
@@ -567,8 +568,8 @@ begin:
 	 * we changed, the parent may have changed too.
 	 */
 	fsstack_copy_attr_times(parent_dentry->d_inode,
-				lower_parent_dentry->d_inode);
-	//u2fs_copy_attr_times(child_dentry->d_inode);
+			lower_parent_dentry->d_inode);
+	u2fs_copy_attr_times(child_dentry->d_inode);
 
 	parent_dentry = child_dentry;
 	child_dentry = path[--count];
@@ -599,7 +600,7 @@ void u2fs_postcopyup_setmnt(struct dentry *dentry)
 	parent = dentry;
 	while (!u2fs_get_lower_mnt(parent, 0)) {
 		u2fs_set_lower_mnt(parent, 0,
-					  u2fs_mntget(hasone, 0));
+				u2fs_mntget(hasone, 0));
 		parent = parent->d_parent;
 	}
 }

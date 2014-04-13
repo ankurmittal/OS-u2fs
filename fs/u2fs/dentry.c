@@ -27,7 +27,8 @@ static int u2fs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 
 	left_path = u2fs_get_path(dentry, 0);
 	lower_dentry = left_path->dentry;
-	if (!lower_dentry || !lower_dentry->d_op || !lower_dentry->d_op->d_revalidate)
+	if (!lower_dentry || !lower_dentry->d_op
+			|| !lower_dentry->d_op->d_revalidate)
 		goto out;
 	pathcpy(&saved_path, &nd->path);
 	pathcpy(&nd->path, left_path);

@@ -79,7 +79,8 @@ static int u2fs_remount_fs(struct super_block *sb, int *flags, char *options)
 	 */
 	if ((*flags & ~(MS_RDONLY | MS_MANDLOCK | MS_SILENT)) != 0) {
 		printk(KERN_ERR
-				"u2fs: remount flags 0x%x unsupported\n", *flags);
+				"u2fs: remount flags 0x%x unsupported\n"
+				, *flags);
 		err = -EINVAL;
 	}
 

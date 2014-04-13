@@ -251,7 +251,6 @@ int create_whiteout(struct dentry *dentry)
 	struct dentry *lower_dir_dentry;
 	struct dentry *lower_dentry;
 	struct dentry *lower_wh_dentry;
-	struct nameidata nd;
 	char *name = NULL;
 	int err = -EINVAL;
 
@@ -266,7 +265,7 @@ int create_whiteout(struct dentry *dentry)
 
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 
-	if (!lower_dentry || !lower_dentry->d_parent || !lower_dentry->d_parent->d_inode) {
+	if (!has_valid_parent(lower_dentry)) {
 		UDBG;
 		/*
 		 * if lower dentry is not present, create the
@@ -292,12 +291,6 @@ int create_whiteout(struct dentry *dentry)
 	lower_wh_dentry =
 		lookup_lck_len(name, lower_dentry->d_parent,
 				dentry->d_name.len + U2FS_WHLEN);
-	//		if (IS_ERR(lower_wh_dentry))
-	//			continue;
-
-	//err = init_lower_nd(&nd, LOOKUP_CREATE);
-	//if (unlikely(err < 0))
-	//	goto out;
 	lower_dir_dentry = lock_parent(lower_wh_dentry);
 	err = vfs_create(lower_dir_dentry->d_inode,
 			lower_wh_dentry,
@@ -305,7 +298,6 @@ int create_whiteout(struct dentry *dentry)
 			NULL);
 	unlock_dir(lower_dir_dentry);
 	dput(lower_wh_dentry);
-	//release_lower_nd(&nd, err);
 
 
 

@@ -12,7 +12,7 @@
 #include "u2fs.h"
 
 static int u2fs_create(struct inode *dir, struct dentry *dentry,
-			 int mode, struct nameidata *nd)
+		int mode, struct nameidata *nd)
 {
 	int err = 0;
 	struct dentry *lower_dentry;
@@ -36,7 +36,7 @@ static int u2fs_create(struct inode *dir, struct dentry *dentry,
 	 * If we get here, then check if copyup needed.  If lower_dentry is
 	 * NULL, create the entire dentry directory structure in branch 0.
 	 */
-	if(!has_valid_parent(lower_dentry)) {
+	if (!has_valid_parent(lower_dentry)) {
 		lower_dentry = create_parents(dir, dentry,
 				dentry->d_name.name);
 		if (IS_ERR(lower_dentry)) {
@@ -129,8 +129,6 @@ out:
 	mnt_drop_write(lower_new_path->mnt);
 out_unlock:
 	unlock_dir(lower_dir_dentry);
-	//u2fs_put_path(old_dentry, &lower_old_path);
-	//u2fs_put_path(new_dentry, &lower_new_path);
 	return err;
 }
 
@@ -141,13 +139,12 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 	struct vfsmount *mnt = NULL, *mnt_temp;
 	int err, index = 1;
 	bool is_right_valid = false, is_left_valid = false;
-	printk("Unlink File: %s", dentry->d_name.name);
 	parent = u2fs_lock_parent(dentry);
 	do {
 		dent_temp = u2fs_get_lower_dentry(dentry, index);
 		mnt_temp = u2fs_get_lower_mnt(dentry, index);
-		if(dent_temp && dent_temp->d_inode) {
-			if(index)
+		if (dent_temp && dent_temp->d_inode) {
+			if (index)
 				is_right_valid = true;
 			else
 				is_left_valid = true;
@@ -155,17 +152,16 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 			mnt = mnt_temp;
 		}
 		index--;
-	} while(index >= 0);
+	} while (index >= 0);
 	UDBG;
-	if(!lower_dentry || !lower_dentry->d_inode) {
+	if (!lower_dentry || !lower_dentry->d_inode) {
 		err = -ENOENT;
 		goto out_return;
 	}
 
 	UDBG;
 	dget(lower_dentry);
-	printk("Dentry Use: %p\n", lower_dentry);
-	lower_dir_dentry = u2fs_get_lower_dentry(parent, is_left_valid?0:1);
+	lower_dir_dentry = u2fs_get_lower_dentry(parent, is_left_valid ? 0 : 1);
 
 	UDBG;
 	err = mnt_want_write(mnt);
@@ -173,20 +169,22 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 		goto out_unlock;
 	/*Delete File in left brach*/
 	UDBG;
-	if(is_left_valid) {
-		if(!S_ISDIR(lower_dentry->d_inode->i_mode))
-			err = vfs_unlink(lower_dir_dentry->d_inode, lower_dentry);
+	if (is_left_valid) {
+		if (!S_ISDIR(lower_dentry->d_inode->i_mode))
+			err = vfs_unlink(lower_dir_dentry->d_inode, \
+					lower_dentry);
 		else
-			err = vfs_rmdir(lower_dir_dentry->d_inode, lower_dentry);
+			err = vfs_rmdir(lower_dir_dentry->d_inode,
+					lower_dentry);
 
 	}
 
 	UDBG;
 	if (err)
 		goto out;
-	if(is_right_valid)
+	if (is_right_valid)
 		err = create_whiteout(dentry);
-	if(!err)
+	if (!err)
 		inode_dec_link_count(dentry->d_inode);
 	//fsstack_copy_attr_times(dir, lower_dir_inode);
 	//fsstack_copy_inode_size(dir, lower_dir_inode);
@@ -204,7 +202,6 @@ out_unlock:
 	UDBG;
 	dput(lower_dentry);
 	UDBG;
-	//	u2fs_put_path(dentry, left_path);
 out_return:
 	u2fs_unlock_parent(dentry, parent);
 	UDBG;
@@ -234,7 +231,7 @@ static int u2fs_symlink(struct inode *dir, struct dentry *dentry,
 	 * If we get here, then check if copyup needed.  If lower_dentry is
 	 * NULL, create the entire dentry directory structure in branch 0.
 	 */
-	if(!has_valid_parent(lower_dentry)) {
+	if (!has_valid_parent(lower_dentry)) {
 		lower_dentry = create_parents(dir, dentry,
 				dentry->d_name.name);
 		if (IS_ERR(lower_dentry)) {
@@ -266,9 +263,8 @@ static int u2fs_symlink(struct inode *dir, struct dentry *dentry,
 out_unlock:
 	unlock_dir(lower_parent_dentry);
 
-	if (!err) {
+	if (!err)
 		u2fs_postcopyup_setmnt(dentry);
-	}
 out:
 	return err;
 }
@@ -298,7 +294,7 @@ static int u2fs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	 * If we get here, then check if copyup needed.  If lower_dentry is
 	 * NULL, create the entire dentry directory structure in branch 0.
 	 */
-	if(!has_valid_parent(lower_dentry)) {
+	if (!has_valid_parent(lower_dentry)) {
 		lower_dentry = create_parents(dir, dentry,
 				dentry->d_name.name);
 		if (IS_ERR(lower_dentry)) {
@@ -360,7 +356,6 @@ out:
 	mnt_drop_write(left_path->mnt);
 out_unlock:
 	unlock_dir(lower_dir_dentry);
-	//	u2fs_put_path(dentry, left_path);
 	return err;
 }
 #endif
@@ -394,7 +389,6 @@ out:
 	mnt_drop_write(left_path->mnt);
 out_unlock:
 	unlock_dir(lower_parent_dentry);
-	//	u2fs_put_path(dentry, left_path);
 	return err;
 }
 
@@ -461,8 +455,6 @@ out:
 	unlock_rename(lower_old_dir_dentry, lower_new_dir_dentry);
 	dput(lower_old_dir_dentry);
 	dput(lower_new_dir_dentry);
-	//u2fs_put_path(old_dentry, &lower_old_path);
-	//u2fs_put_path(new_dentry, &lower_new_path);
 	return err;
 }
 
@@ -487,7 +479,6 @@ static int u2fs_readlink(struct dentry *dentry, char __user *buf, int bufsiz)
 	fsstack_copy_attr_atime(dentry->d_inode, lower_dentry->d_inode);
 
 out:
-	//	u2fs_put_path(dentry, left_path);
 	return err;
 }
 
@@ -562,7 +553,7 @@ static int u2fs_setattr(struct dentry *dentry, struct iattr *ia)
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 
 	/*TODO : COPYUP*/
-	if(!lower_dentry || !lower_dentry->d_inode) {
+	if (!lower_dentry || !lower_dentry->d_inode) {
 		err = -EPERM;
 		goto out_err;
 	}
@@ -617,7 +608,6 @@ static int u2fs_setattr(struct dentry *dentry, struct iattr *ia)
 	 */
 
 out:
-	//	u2fs_put_path(dentry, left_path);
 out_err:
 	return err;
 }
