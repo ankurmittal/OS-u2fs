@@ -339,8 +339,8 @@ static int __open_file(struct inode *inode, struct file *file,
 		 * defer it.
 		 */
 		printk("in if\n");
-		if (lower_flags & O_TRUNC) {
-			int size = 0;
+		if ((lower_flags & O_TRUNC) || (lower_flags & O_APPEND)) {
+			int size = i_size_read(lower_dentry->d_inode);
 			int err = -EROFS;
 			UDBG;
 			err = copyup_file(parent->d_inode, file, size);
@@ -351,10 +351,6 @@ static int __open_file(struct inode *inode, struct file *file,
 			bIndex = 0;
 
 		} else {
-			/*
-			 * turn off writeable flags, to force delayed copyup
-			 * by caller.
-			 */
 			lower_flags &= ~(OPEN_WRITE_FLAGS);
 		}
 	}

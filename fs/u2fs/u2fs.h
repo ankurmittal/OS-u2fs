@@ -81,6 +81,7 @@ extern void u2fs_copy_attr_times(struct inode *upper);
 extern void u2fs_postcopyup_setmnt(struct dentry *dentry);
 extern void u2fs_postcopyup_release(struct dentry *dentry);
 extern int copyup_file(struct inode *dir, struct file *file, loff_t len);
+extern int check_unlink_whiteout(struct dentry *dentry, struct dentry *lower_dentry);
 
 /* file private data */
 struct u2fs_file_info {
@@ -147,6 +148,13 @@ static inline void init_filldir_heads(struct list_head *heads, int head_list_siz
 	int i;
 	for (i = 0; i < head_list_size; i++)
 		INIT_LIST_HEAD(&heads[i]);
+}
+
+static bool inline has_valid_parent(struct dentry *dentry)
+{
+	if(!dentry || !dentry->d_parent || !dentry->d_parent->d_inode)
+		return false;
+	return true;
 }
 /*
  * inode to private data
