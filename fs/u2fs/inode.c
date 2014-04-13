@@ -158,7 +158,7 @@ out:
 	mnt_drop_write(mnt);
 	UDBG;
 out_unlock:
-	unlock_dir(lower_dir_dentry);
+	//unlock_dir(lower_dir_dentry);
 	UDBG;
 	dput(lower_dentry);
 	UDBG;

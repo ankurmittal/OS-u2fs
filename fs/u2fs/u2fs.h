@@ -32,6 +32,10 @@
 /* u2fs root inode number */
 #define U2FS_ROOT_INO     1
 
+#define IS_COPYUP_ERR(err) ((err) == -EROFS)
+
+#define DIREOF (0xfffff)
+
 /* useful for tracking code reachability */
 #define UDBG printk(KERN_DEFAULT "DBG:%s:%s:%d\n", __FILE__, __func__, __LINE__)
 /* u2fs_open, check if we need to copyup the file */
@@ -71,6 +75,8 @@ extern struct filldir_node *find_filldir_node(const char *name, int namelen,
 extern int add_filldir_node(const char *name, int namelen, int whiteout,
 			struct list_head *heads, int head_list_size);
 extern void free_filldir_heads(struct list_head *heads, int head_list_size);
+extern struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
+			      const char *name);
 
 /* file private data */
 struct u2fs_file_info {

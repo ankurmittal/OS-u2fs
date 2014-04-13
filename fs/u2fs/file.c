@@ -161,6 +161,8 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 					lower_file->f_path.dentry->d_inode);
 		else break;
 	}
+	if(!err)
+		file->f_pos = DIREOF;
 	free_filldir_heads(filldir_heads, FILLDIR_SIZE);
 	return err;
 }

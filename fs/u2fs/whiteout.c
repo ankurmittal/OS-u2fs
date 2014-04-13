@@ -266,7 +266,8 @@ int create_whiteout(struct dentry *dentry)
 
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 
-	if (!lower_dentry) {
+	if (!lower_dentry || !lower_dentry->d_parent || !lower_dentry->d_parent->d_inode) {
+		UDBG;
 		/*
 		 * if lower dentry is not present, create the
 		 * entire lower dentry directory structure and go
@@ -274,20 +275,18 @@ int create_whiteout(struct dentry *dentry)
 		 * only want the parent dentry, and hence get rid of
 		 * this dentry.
 		 */
-		//TODO:
-		/*	lower_dentry = create_parents(dentry->d_inode,
-			dentry,
-			dentry->d_name.name,
-			bindex);
-			if (!lower_dentry || IS_ERR(lower_dentry)) {
+		lower_dentry = create_parents(dentry->d_inode,
+				dentry,
+				dentry->d_name.name);
+		if (!lower_dentry || IS_ERR(lower_dentry)) {
 			int ret = PTR_ERR(lower_dentry);
 			if (!IS_COPYUP_ERR(ret))
-			printk(KERN_ERR
-			"u2fs: create_parents for "
-			"whiteout failed: bindex=%d "
-			"err=%d\n", bindex, ret);
-			continue;
-			}*/
+				printk(KERN_ERR
+						"u2fs: create_parents for "
+						"whiteout failed: "
+						"err=%d\n", ret);
+			goto out;
+		}
 	}
 
 	lower_wh_dentry =
