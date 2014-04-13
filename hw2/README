@@ -7,7 +7,8 @@ INSTALLATION:
  				insmod fs/u2fs.ko
  3. Create a left directory and a right directory
  4. Mount the file system using
- 	mount -t u2fs -o ldir=<left_dir>,rdir=<right_dir> null /mnt/u2fs     #/mnt/u2fs should exists
+ 	mount -t u2fs -o ldir=<left_dir>,rdir=<right_dir> null /mnt/u2fs     #/mnt/u2fs should exist
+    -- If an error occurs, dmesg can be checked for proper errors.
  5. Now you can cd to /mnt/u2fs and issue normal file system commands
 
 DESIGN:

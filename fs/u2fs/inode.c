@@ -90,6 +90,7 @@ void u2fs_copy_attr_times(struct inode *upper)
 		upper->i_atime = lower->i_atime;
 }
 
+
 static int u2fs_link(struct dentry *old_dentry, struct inode *dir,
 		struct dentry *new_dentry)
 {
@@ -98,18 +99,23 @@ static int u2fs_link(struct dentry *old_dentry, struct inode *dir,
 	struct dentry *lower_dir_dentry;
 	u64 file_size_save;
 	int err;
-	struct path *lower_old_path, *lower_new_path;
 
 	file_size_save = i_size_read(old_dentry->d_inode);
-	lower_old_path = u2fs_get_path(old_dentry, 0);
-	lower_new_path = u2fs_get_path(new_dentry, 0);
-	lower_old_dentry = lower_old_path->dentry;
-	lower_new_dentry = lower_new_path->dentry;
+
+	lower_old_dentry = u2fs_get_lower_dentry(old_dentry, 0);
+	lower_new_dentry = u2fs_get_lower_dentry(new_dentry, 0);
+
+	if (!has_valid_parent(lower_new_dentry)) {
+		err = -EPERM;
+		return err;
+	}
+
+	if (!lower_old_dentry || !lower_old_dentry->d_inode)
+		lower_old_dentry = u2fs_get_lower_dentry(old_dentry, 1);
+
+
 	lower_dir_dentry = lock_parent(lower_new_dentry);
 
-	err = mnt_want_write(lower_new_path->mnt);
-	if (err)
-		goto out_unlock;
 
 	err = vfs_link(lower_old_dentry, lower_dir_dentry->d_inode,
 			lower_new_dentry);
@@ -126,8 +132,6 @@ static int u2fs_link(struct dentry *old_dentry, struct inode *dir,
 			u2fs_lower_inode(old_dentry->d_inode)->i_nlink);
 	i_size_write(new_dentry->d_inode, file_size_save);
 out:
-	mnt_drop_write(lower_new_path->mnt);
-out_unlock:
 	unlock_dir(lower_dir_dentry);
 	return err;
 }
@@ -139,7 +143,7 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 	struct vfsmount *mnt = NULL, *mnt_temp;
 	int err, index = 1;
 	bool is_right_valid = false, is_left_valid = false;
-	parent = u2fs_lock_parent(dentry);
+	parent = dget_parent(dentry);
 	do {
 		dent_temp = u2fs_get_lower_dentry(dentry, index);
 		mnt_temp = u2fs_get_lower_mnt(dentry, index);
@@ -203,7 +207,7 @@ out_unlock:
 	dput(lower_dentry);
 	UDBG;
 out_return:
-	u2fs_unlock_parent(dentry, parent);
+	dput(parent);
 	UDBG;
 	return err;
 }
@@ -457,15 +461,17 @@ out:
 	dput(lower_new_dir_dentry);
 	return err;
 }
-
-static int u2fs_readlink(struct dentry *dentry, char __user *buf, int bufsiz)
+/* requires sb, dentry, and parent to already be locked */
+static int __u2fs_readlink(struct dentry *dentry, char __user *buf,
+		int bufsiz)
 {
 	int err;
 	struct dentry *lower_dentry;
-	struct path *left_path;
 
-	left_path = u2fs_get_path(dentry, 0);
-	lower_dentry = left_path->dentry;
+	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
+	if (!lower_dentry || !lower_dentry->d_inode)
+		lower_dentry = u2fs_get_lower_dentry(dentry, 1);
+
 	if (!lower_dentry->d_inode->i_op ||
 			!lower_dentry->d_inode->i_op->readlink) {
 		err = -EINVAL;
@@ -474,11 +480,26 @@ static int u2fs_readlink(struct dentry *dentry, char __user *buf, int bufsiz)
 
 	err = lower_dentry->d_inode->i_op->readlink(lower_dentry,
 			buf, bufsiz);
-	if (err < 0)
-		goto out;
-	fsstack_copy_attr_atime(dentry->d_inode, lower_dentry->d_inode);
+	if (err >= 0)
+		fsstack_copy_attr_atime(dentry->d_inode,
+				lower_dentry->d_inode);
 
 out:
+	return err;
+}
+
+static int u2fs_readlink(struct dentry *dentry, char __user *buf,
+		int bufsiz)
+{
+	int err;
+	struct dentry *parent;
+
+	parent = u2fs_lock_parent(dentry);
+
+	err = __u2fs_readlink(dentry, buf, bufsiz);
+
+	u2fs_unlock_parent(dentry, parent);
+
 	return err;
 }
 
@@ -487,37 +508,51 @@ static void *u2fs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	char *buf;
 	int len = PAGE_SIZE, err;
 	mm_segment_t old_fs;
+	struct dentry *parent;
+
+	parent = u2fs_lock_parent(dentry);
 
 	/* This is freed by the put_link method assuming a successful call. */
 	buf = kmalloc(len, GFP_KERNEL);
-	if (!buf) {
-		buf = ERR_PTR(-ENOMEM);
+	if (unlikely(!buf)) {
+		err = -ENOMEM;
 		goto out;
 	}
 
 	/* read the symlink, and then we will follow it */
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	err = u2fs_readlink(dentry, buf, len);
+	err = __u2fs_readlink(dentry, buf, len);
 	set_fs(old_fs);
 	if (err < 0) {
 		kfree(buf);
-		buf = ERR_PTR(err);
-	} else {
-		buf[err] = '\0';
+		buf = NULL;
+		goto out;
 	}
-out:
+	buf[err] = 0;
 	nd_set_link(nd, buf);
-	return NULL;
+	err = 0;
+
+out:
+
+	u2fs_unlock_parent(dentry, parent);
+
+	return ERR_PTR(err);
 }
 
 /* this @nd *IS* still used */
 static void u2fs_put_link(struct dentry *dentry, struct nameidata *nd,
 		void *cookie)
 {
-	char *buf = nd_get_link(nd);
-	if (!IS_ERR(buf))	/* free the char* */
+	struct dentry *parent;
+	char *buf;
+
+	parent = u2fs_lock_parent(dentry);
+
+	buf = nd_get_link(nd);
+	if (!IS_ERR(buf))
 		kfree(buf);
+	u2fs_unlock_parent(dentry, parent);
 }
 
 static int u2fs_permission(struct inode *inode, int mask)
