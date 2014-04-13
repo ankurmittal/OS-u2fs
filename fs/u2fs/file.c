@@ -11,6 +11,12 @@
 
 #include "u2fs.h"
 #define FILLDIR_SIZE 100
+
+#ifdef CONFIG_U2_DUP_ELIMINATION
+#define DUP_ELIM true
+#else
+#define DUP_ELIM false
+#endif
 static ssize_t u2fs_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
@@ -85,7 +91,6 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 	is_whiteout = is_whiteout_name(&name, &namelen);
 
 
-
 	/* if 'name' isn't a whiteout, filldir it. */
 	if (!is_whiteout) {
 		/* Find Deleted Entry */
@@ -115,7 +120,7 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 
 	buf->entries_written++;
 	#endif
-	if (!err && (is_whiteout && !buf->is_right))
+	if (!err && ((DUP_ELIM || is_whiteout) && !buf->is_right))
 		err = add_filldir_node(name, namelen,
 			is_whiteout, buf->heads, buf->heads_size);
 	#if 0

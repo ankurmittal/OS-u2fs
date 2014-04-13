@@ -2,8 +2,12 @@ config U2_FS
 	tristate "U2fs stackable file system (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	help
-	  U2fs is a stackable file system which simply passes its
-	  operations to the lower layer.  It is designed as a useful
-	  template for developing or debugging other stackable file systems,
-	  and more (see Documentation/filesystems/wrapfs.txt).  See
-	  <http://wrapfs.filesystems.org/> for details.
+	  U2fs is a stackable unification file system, which appears to
+	  merge the contents of two directories (branches), while keeping
+	  their physical content separate (see hw2/README).
+
+config U2_DUP_ELIMINATION
+	bool "Unionfs extended attributes"
+	depends on U2_FS
+	help
+	  Eliminates duplicates entries from readdir call to show user unified directory listing.
