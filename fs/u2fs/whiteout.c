@@ -164,9 +164,8 @@ int unlink_whiteout(struct dentry *wh_dentry)
 	/* dget and lock parent dentry */
 	lower_dir_dentry = lock_parent(wh_dentry);
 
-	//lockdep_off();
 	err = vfs_unlink(lower_dir_dentry->d_inode, wh_dentry);
-	//lockdep_on();
+
 	unlock_dir(lower_dir_dentry);
 
 	/*
@@ -254,7 +253,6 @@ int create_whiteout(struct dentry *dentry)
 	char *name = NULL;
 	int err = -EINVAL;
 
-	//verify_locked(dentry);
 
 	/* create dentry's whiteout equivalent */
 	name = alloc_whname(dentry->d_name.name, dentry->d_name.len);
@@ -312,7 +310,7 @@ out:
  * lower directory inode should be locked
  */
 
-//TODO: check where it is called and find alternative
+/*TODO: check where it is called and find alternative*/
 #if 0
 static int do_delete_whiteouts(struct dentry *dentry, int bindex,
 			       struct u2fs_dir_state *namelist)

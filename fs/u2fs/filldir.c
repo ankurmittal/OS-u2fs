@@ -25,7 +25,7 @@ int u2fs_init_filldir_cache(void)
 				sizeof(struct filldir_node), 0,
 				SLAB_RECLAIM_ACCOUNT, NULL);
 
-	return (u2fs_filldir_cachep ? 0 : -ENOMEM);
+	return u2fs_filldir_cachep ? 0 : -ENOMEM;
 }
 
 void u2fs_destroy_filldir_cache(void)
