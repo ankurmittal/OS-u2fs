@@ -77,6 +77,10 @@ extern int add_filldir_node(const char *name, int namelen, int whiteout,
 extern void free_filldir_heads(struct list_head *heads, int head_list_size);
 extern struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
 			      const char *name);
+extern void u2fs_copy_attr_times(struct inode *upper);
+extern void u2fs_postcopyup_setmnt(struct dentry *dentry);
+extern void u2fs_postcopyup_release(struct dentry *dentry);
+extern int copyup_file(struct inode *dir, struct file *file, loff_t len);
 
 /* file private data */
 struct u2fs_file_info {
@@ -357,19 +361,9 @@ static inline struct dentry *lookup_lck_len(const char *name,
 		struct dentry *base, int len)
 {
 	struct dentry *d;
-	//struct nameidata lower_nd;
-	//int err;
-
-	//	err = init_lower_nd(&lower_nd, LOOKUP_OPEN);
-	//	if (unlikely(err < 0)) {
-	//		d = ERR_PTR(err);
-	//		goto out;
-	//	}
 	mutex_lock(&base->d_inode->i_mutex);
 	d = lookup_one_len(name, base, len);
-	//release_lower_nd(&lower_nd, err);
 	mutex_unlock(&base->d_inode->i_mutex);
-	//out:
 	return d;
 }
 

@@ -37,7 +37,7 @@ static ssize_t u2fs_read(struct file *file, char __user *buf,
 static ssize_t u2fs_write(struct file *file, const char __user *buf,
 		size_t count, loff_t *ppos)
 {
-	int err = -ENOENT, i;
+	int err = -ENOENT;
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
 
@@ -47,15 +47,13 @@ static ssize_t u2fs_write(struct file *file, const char __user *buf,
 	//err = u2fs_file_revalidate(file, parent, true);
 	//if (unlikely(err))
 	//	goto out;
-
- 	for(i=0; i < 2; i++) {
-		lower_dentry = u2fs_get_lower_dentry(dentry, i);
+	UDBG;
+	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 		if (!lower_dentry || !lower_dentry->d_inode)
-			continue;
-		lower_file = u2fs_lower_file(file, i);
-		err = vfs_write(lower_file, buf, count, ppos);
-		break;
-	}
+			return err;
+	lower_file = u2fs_lower_file(file, 0);
+	err = vfs_write(lower_file, buf, count, ppos);
+
 	/* update our inode times+sizes upon a successful lower write */
 	if (err >= 0) {
 		fsstack_copy_inode_size(dentry->d_inode,
@@ -322,7 +320,7 @@ static int __open_file(struct inode *inode, struct file *file,
 	struct vfsmount *lower_mnt;
 	int bIndex = 0;
 
-	printk("Open File\n");
+	printk("Open File: %s\n", dentry->d_name.name);
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 	if(!lower_dentry || !lower_dentry->d_inode) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, 1);
@@ -342,14 +340,16 @@ static int __open_file(struct inode *inode, struct file *file,
 		 */
 		printk("in if\n");
 		if (lower_flags & O_TRUNC) {
-			//TODO:
-			/*int size = 0;
-			  int err = -EROFS;
+			int size = 0;
+			int err = -EROFS;
+			UDBG;
+			err = copyup_file(parent->d_inode, file, size);
+			UDBG;
+			if(err)
+				return err;
+			lower_dentry = u2fs_get_lower_dentry(dentry, 0);
+			bIndex = 0;
 
-			  copyup the file
-			  err = copyup_file(parent->d_inode, file, size);
-			  return err;*/
-			  return -EPERM;
 		} else {
 			/*
 			 * turn off writeable flags, to force delayed copyup

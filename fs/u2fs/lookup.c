@@ -291,7 +291,6 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 			}
 			if (wh_lower_dentry->d_inode) {
 				dput(wh_lower_dentry);
-			UDBG;
 				break;
 			}
 			dput(wh_lower_dentry);
