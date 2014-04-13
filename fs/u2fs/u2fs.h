@@ -52,7 +52,8 @@ extern const struct super_operations u2fs_sops;
 extern const struct dentry_operations u2fs_dops;
 extern const struct address_space_operations u2fs_aops, u2fs_dummy_aops;
 extern const struct vm_operations_struct u2fs_vm_ops;
-extern struct dentry *lookup_whiteout(const char *name, struct dentry *lower_parent);
+extern struct dentry *lookup_whiteout(const char *name,
+		struct dentry *lower_parent);
 extern int u2fs_init_inode_cache(void);
 extern void u2fs_destroy_inode_cache(void);
 extern int u2fs_init_dentry_cache(void);
@@ -60,9 +61,9 @@ extern void u2fs_destroy_dentry_cache(void);
 extern int new_dentry_private_data(struct dentry *dentry);
 extern void free_dentry_private_data(struct dentry *dentry);
 extern struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
-				    struct nameidata *nd);
+		struct nameidata *nd);
 extern struct inode *u2fs_iget(struct super_block *sb,
-				 struct inode *lower_inode);
+		struct inode *lower_inode);
 extern int u2fs_interpose(struct dentry *dentry, struct super_block *sb);
 extern int create_whiteout(struct dentry *dentry);
 extern bool is_whiteout_name(char **namep, int *namelenp);
@@ -73,15 +74,17 @@ extern void u2fs_destroy_filldir_cache(void);
 extern struct filldir_node *find_filldir_node(const char *name, int namelen,
 		struct list_head *heads, int head_list_size);
 extern int add_filldir_node(const char *name, int namelen, int whiteout,
-			struct list_head *heads, int head_list_size);
+		struct list_head *heads, int head_list_size);
 extern void free_filldir_heads(struct list_head *heads, int head_list_size);
 extern struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
-			      const char *name);
+		const char *name);
 extern void u2fs_copy_attr_times(struct inode *upper);
 extern void u2fs_postcopyup_setmnt(struct dentry *dentry);
 extern void u2fs_postcopyup_release(struct dentry *dentry);
 extern int copyup_file(struct inode *dir, struct file *file, loff_t len);
-extern int check_unlink_whiteout(struct dentry *dentry, struct dentry *lower_dentry);
+extern int check_unlink_whiteout(struct dentry *dentry,
+		struct dentry *lower_dentry);
+extern void u2fs_set_max_namelen(long *namelen);
 
 /* file private data */
 struct u2fs_file_info {
@@ -134,7 +137,6 @@ struct filldir_node {
 	 * we can check for duplicate whiteouts and files in the same branch
 	 * in order to return -EIO.
 	 */
-	//int bindex;
 
 	/* is this a whiteout entry? */
 	int whiteout;
@@ -143,16 +145,17 @@ struct filldir_node {
 	char iname[DNAME_INLINE_LEN];
 };
 
-static inline void init_filldir_heads(struct list_head *heads, int head_list_size)
+static inline void init_filldir_heads(struct list_head *heads,
+int head_list_size)
 {
 	int i;
 	for (i = 0; i < head_list_size; i++)
 		INIT_LIST_HEAD(&heads[i]);
 }
 
-static bool inline has_valid_parent(struct dentry *dentry)
+static inline bool has_valid_parent(struct dentry *dentry)
 {
-	if(!dentry || !dentry->d_parent || !dentry->d_parent->d_inode)
+	if (!dentry || !dentry->d_parent || !dentry->d_parent->d_inode)
 		return false;
 	return true;
 }
@@ -178,7 +181,7 @@ static inline struct u2fs_inode_info *U2FS_I(const struct inode *inode)
 #define U2FS_F(file) ((struct u2fs_file_info *)((file)->private_data))
 
 /* file to lower file */
-static inline struct file* u2fs_lower_file(struct file *f, int is_right)
+static inline struct file *u2fs_lower_file(struct file *f, int is_right)
 {
 	if (is_right)
 		return U2FS_F(f)->right_file;
@@ -186,7 +189,8 @@ static inline struct file* u2fs_lower_file(struct file *f, int is_right)
 		return U2FS_F(f)->left_file;
 
 }
-static inline void u2fs_set_lower_file(struct file *f, int is_right, struct file *val)
+static inline void u2fs_set_lower_file(struct file *f,
+		int is_right, struct file *val)
 {
 	if (is_right)
 		U2FS_F(f)->right_file = val;
@@ -197,12 +201,12 @@ static inline void u2fs_set_lower_file(struct file *f, int is_right, struct file
 
 static inline void u2fs_put_all_lower_files(struct file *f)
 {
-	if(U2FS_F(f)->right_file) {
+	if (U2FS_F(f)->right_file) {
 		fput(U2FS_F(f)->right_file);
 		U2FS_F(f)->right_file = NULL;
 	}
 
-	if(U2FS_F(f)->left_file) {
+	if (U2FS_F(f)->left_file) {
 		fput(U2FS_F(f)->left_file);
 		U2FS_F(f)->left_file = NULL;
 	}
@@ -247,7 +251,8 @@ static inline void pathcpy(struct path *dst, const struct path *src)
 	dst->mnt = src->mnt;
 }
 /* Returns struct path.  Caller must path_put it. */
-static inline struct path *u2fs_get_path(const struct dentry *dent, int is_right)
+static inline struct path *u2fs_get_path(const struct dentry *dent,
+		int is_right)
 {
 	if (is_right)
 		return &U2FS_D(dent)->right_path;
@@ -281,9 +286,10 @@ static inline void u2fs_set_right_path(const struct dentry *dent,
 	return;
 }
 
-static inline struct dentry* u2fs_get_lower_dentry(struct dentry *dent, int is_right)
+static inline struct dentry *u2fs_get_lower_dentry(struct dentry *dent,
+		int is_right)
 {
-	if(is_right)
+	if (is_right)
 		return U2FS_D(dent)->right_path.dentry;
 	else
 		return U2FS_D(dent)->left_path.dentry;
@@ -292,7 +298,7 @@ static inline struct dentry* u2fs_get_lower_dentry(struct dentry *dent, int is_r
 static inline void u2fs_set_lower_dentry(struct dentry *dent, int is_right,
 		struct dentry *val)
 {
-	if(is_right)
+	if (is_right)
 		U2FS_D(dent)->right_path.dentry = val;
 	else
 		U2FS_D(dent)->left_path.dentry = val;
@@ -301,7 +307,7 @@ static inline void u2fs_set_lower_dentry(struct dentry *dent, int is_right,
 static inline struct vfsmount *u2fs_get_lower_mnt(struct dentry *dent,
 		int is_right)
 {
-	if(is_right)
+	if (is_right)
 		return U2FS_D(dent)->right_path.mnt;
 	else
 		return U2FS_D(dent)->left_path.mnt;
@@ -310,7 +316,7 @@ static inline struct vfsmount *u2fs_get_lower_mnt(struct dentry *dent,
 static inline void u2fs_set_lower_mnt(struct dentry *dent,
 		int is_right, struct vfsmount *val)
 {
-	if(is_right)
+	if (is_right)
 		U2FS_D(dent)->right_path.mnt = val;
 	else
 		U2FS_D(dent)->left_path.mnt = val;
@@ -331,7 +337,7 @@ static inline void u2fs_set_path(const struct dentry *dent,
 		struct path *path, int is_right)
 {
 	spin_lock(&U2FS_D(dent)->lock);
-	if(!is_right)
+	if (!is_right)
 		pathcpy(&U2FS_D(dent)->left_path, path);
 	else
 		pathcpy(&U2FS_D(dent)->right_path, path);
@@ -382,9 +388,8 @@ static inline struct dentry *u2fs_lock_parent(struct dentry *d)
 
 	BUG_ON(!d);
 	p = dget_parent(d);
-	//TODO
-	//if (p != d)
-	//	mutex_lock_nested(&U2FS_D(p)->lock, subclass);
+	if (p != d)
+		mutex_lock_nested(&p->d_inode->i_mutex, I_MUTEX_PARENT);
 	return p;
 }
 /* The root directory is unhashed, but isn't deleted. */
@@ -398,11 +403,8 @@ static inline void u2fs_unlock_parent(struct dentry *d, struct dentry *p)
 {
 	BUG_ON(!d);
 	BUG_ON(!p);
-	//TODO
-	/*if (p != d) {
-	  BUG_ON(!mutex_is_locked(&U2FS_D(p)->lock));
-	  mutex_unlock(&U2FS_D(p)->lock);
-	  }*/
+	if (p != d)
+		mutex_unlock(&p->d_inode->i_mutex);
 	dput(p);
 }
 

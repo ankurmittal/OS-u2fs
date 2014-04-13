@@ -40,10 +40,23 @@ static int u2fs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	int err;
 	struct path *left_path;
-
-	left_path = u2fs_get_path(dentry, 0);
+	struct super_block *sb;
+	sb = dentry->d_sb;
+	left_path = u2fs_get_path(sb->s_root, 0);
 	err = vfs_statfs(left_path, buf);
-	//u2fs_put_path(dentry, &left_path);
+
+	/*
+	 * Our maximum file name can is shorter by a few bytes because every
+	 * file name could potentially be whited-out.
+	 *
+	 */
+	u2fs_set_max_namelen(&buf->f_namelen);
+
+	/*
+	 * reset two fields to avoid confusing user-land.
+	 */
+	memset(&buf->f_fsid, 0, sizeof(__kernel_fsid_t));
+	memset(&buf->f_spare, 0, sizeof(buf->f_spare));
 
 	/* set return buf to our f/s to avoid confusing user-level utils */
 	buf->f_type = U2FS_SUPER_MAGIC;
@@ -66,7 +79,7 @@ static int u2fs_remount_fs(struct super_block *sb, int *flags, char *options)
 	 */
 	if ((*flags & ~(MS_RDONLY | MS_MANDLOCK | MS_SILENT)) != 0) {
 		printk(KERN_ERR
-		       "u2fs: remount flags 0x%x unsupported\n", *flags);
+				"u2fs: remount flags 0x%x unsupported\n", *flags);
 		err = -EINVAL;
 	}
 
@@ -128,8 +141,8 @@ int u2fs_init_inode_cache(void)
 
 	u2fs_inode_cachep =
 		kmem_cache_create("u2fs_inode_cache",
-				  sizeof(struct u2fs_inode_info), 0,
-				  SLAB_RECLAIM_ACCOUNT, init_once);
+				sizeof(struct u2fs_inode_info), 0,
+				SLAB_RECLAIM_ACCOUNT, init_once);
 	if (!u2fs_inode_cachep)
 		err = -ENOMEM;
 	return err;
