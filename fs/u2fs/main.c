@@ -95,7 +95,6 @@ static struct u2fs_dentry_info *u2fs_parse_options(
 		kzalloc(sizeof(struct u2fs_dentry_info), GFP_KERNEL);
 	if (unlikely(!root_info))
 		goto out_error;
-	printk("arg: %s\n",options);
 	while ((optname = strsep(&options, ",")) != NULL) {
 		char *optarg;
 
@@ -151,12 +150,11 @@ static struct u2fs_dentry_info *u2fs_parse_options(
 	}
 
 	err = u2fs_get_kern_path(ldir, &lpath);
-	if(err) {
+	if (err)
 		goto out_error;
-	}
 
 	err = u2fs_get_kern_path(rdir, &rpath);
-	if(err) {
+	if (err) {
 		path_put(&lpath);
 		goto out_error;
 	}
@@ -249,8 +247,6 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 		goto out_pput;
 	}
 	sb->s_root = d_alloc_root(inode);
-	printk("Root Address %p\n", sb->s_root);
-	printk("Root Ref Count %d\n", sb->s_root->d_count);
 	if (!sb->s_root) {
 		err = -ENOMEM;
 		goto out_iput;
@@ -275,17 +271,15 @@ static int u2fs_read_super(struct super_block *sb, void *raw_data, int silent)
 	 * d_rehash it.
 	 */
 	d_rehash(sb->s_root);
-	printk("Root Ref Count %d\n", sb->s_root->d_count);
 	if (!silent)
 		printk(KERN_INFO
 				"u2fs: mounted on top of type %s and %s\n",
-				 left_sb->s_type->name,right_sb->s_type->name);
+				 left_sb->s_type->name, right_sb->s_type->name);
 	goto out; /* all is well */
 
 	/* no longer needed: free_dentry_private_data(sb->s_root); */
 out_freeroot:
 	dput(sb->s_root);
-	printk("Root(put) Ref Count %d\n", sb->s_root->d_count);
 out_iput:
 	iput(inode);
 out_pput:
@@ -307,7 +301,6 @@ static struct dentry *u2fs_mount(struct file_system_type *fs_type,
 	struct dentry *dentry;
 
 	dentry = mount_nodev(fs_type, flags, raw_data, u2fs_read_super);
-	printk("iaddr: %p\n",dentry);
 	if (!IS_ERR(dentry)) {
 		printk("dev_name : %s\n", dev_name);
 		U2FS_SB(dentry->d_sb)->dev_name =
