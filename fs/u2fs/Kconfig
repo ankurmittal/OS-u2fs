@@ -7,7 +7,7 @@ config U2_FS
 	  their physical content separate (see hw2/README).
 
 config U2_DUP_ELIMINATION
-	bool "U2fs extended attributes"
+	bool "U2fs duplicate entries elimination support"
 	depends on U2_FS
 	help
 	  Eliminates duplicates entries from readdir call to show user unified directory listing.
