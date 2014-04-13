@@ -241,7 +241,7 @@ static void __clear(struct dentry *dentry, struct dentry *old_lower_dentry,
  * @len: how many bytes to copy-up?
  */
 int copyup_dentry(struct inode *dir, struct dentry *dentry,
-const char *name, int namelen,
+		const char *name, int namelen,
 		struct file **copyup_file, loff_t len)
 {
 	struct dentry *new_lower_dentry;
@@ -416,7 +416,7 @@ int copyup_file(struct inode *dir, struct file *file, loff_t len)
 	struct dentry *dentry = file->f_path.dentry;
 
 	err = copyup_dentry(dir, dentry, dentry->d_name.name,
-	dentry->d_name.len, &output_file, len);
+			dentry->d_name.len, &output_file, len);
 	if (!err)
 		u2fs_set_lower_file(file, 0, output_file);
 

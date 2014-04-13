@@ -85,6 +85,9 @@ extern int copyup_file(struct inode *dir, struct file *file, loff_t len);
 extern int check_unlink_whiteout(struct dentry *dentry,
 		struct dentry *lower_dentry);
 extern void u2fs_set_max_namelen(long *namelen);
+extern int copyup_dentry(struct inode *dir, struct dentry *dentry,
+		const char *name, int namelen,
+		struct file **copyup_file, loff_t len);
 
 /* file private data */
 struct u2fs_file_info {

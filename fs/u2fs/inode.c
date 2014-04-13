@@ -533,11 +533,11 @@ static int u2fs_permission(struct inode *inode, int mask)
 static int u2fs_setattr(struct dentry *dentry, struct iattr *ia)
 {
 	int err = 0;
-	struct dentry *lower_dentry;
+	struct dentry *lower_dentry, *parent;
 	struct inode *inode;
 	struct inode *lower_inode;
 	struct iattr lower_ia;
-
+	loff_t size;
 	inode = dentry->d_inode;
 
 	/*
@@ -552,11 +552,24 @@ static int u2fs_setattr(struct dentry *dentry, struct iattr *ia)
 
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 
-	/*TODO : COPYUP*/
-	if (!lower_dentry || !lower_dentry->d_inode) {
-		err = -EPERM;
-		goto out_err;
-	}
+	if (ia->ia_valid & ATTR_SIZE)
+		size = ia->ia_size;
+	else
+		size = i_size_read(inode);
+
+	parent = u2fs_lock_parent(dentry);
+
+	err = copyup_dentry(parent->d_inode,
+			dentry,
+			dentry->d_name.name,
+			dentry->d_name.len,
+			NULL, size);
+
+	u2fs_unlock_parent(dentry, parent);
+	if (err)
+		goto out;
+
+	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 
 	lower_inode = lower_dentry->d_inode;
 

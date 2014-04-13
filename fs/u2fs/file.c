@@ -463,17 +463,11 @@ static int u2fs_file_release(struct inode *inode, struct file *file)
 			u2fs_get_lower_dentry(dentry, index);
 		if (!lower_dentry)
 			continue;
-		printk("Dentry put %p\n", lower_dentry);
-		//TODO: Check for all references
+
 		if (d_deleted(lower_dentry)) {
 			dput(lower_dentry);
 			u2fs_set_lower_dentry(dentry, index, NULL);
 		}
-	}
-	if (dentry) {
-		//	dput(dentry);
-		printk("Dentry Address %p\n", dentry);
-		printk("Dentry Count %d\n", dentry->d_count);
 	}
 
 	kfree(U2FS_F(file));
