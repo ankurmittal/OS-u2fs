@@ -31,26 +31,26 @@ struct dentry *__lookup_one(struct dentry *base, struct vfsmount *mnt,
 	err = vfs_path_lookup(base, mnt, name, 0, &lower_path);
 
 	switch (err) {
-		case 0: /* no error */
-			dentry = lower_path.dentry;
-			if (new_mnt)
-				*new_mnt = lower_path.mnt; /* rc already inc'ed */
-			break;
-		case -ENOENT:
-			/*
-			 * We don't consider ENOENT an error, and we want to return
-			 * a negative dentry (ala lookup_one_len).  As we know
-			 * there was no inode for this name before (-ENOENT), then
-			 * it's safe to call lookup_one_len (which doesn't take a
-			 * vfsmount).
-			 */
-			dentry = lookup_lck_len(name, base, strlen(name));
-			if (new_mnt)
-				*new_mnt = mntget(lower_path.mnt);
-			break;
-		default: /* all other real errors */
-			dentry = ERR_PTR(err);
-			break;
+	case 0: /* no error */
+		dentry = lower_path.dentry;
+		if (new_mnt)
+			*new_mnt = lower_path.mnt;
+		break;
+	case -ENOENT:
+		/*
+		 * We don't consider ENOENT an error, and we want to return
+		 * a negative dentry (ala lookup_one_len).  As we know
+		 * there was no inode for this name before (-ENOENT), then
+		 * it's safe to call lookup_one_len (which doesn't take a
+		 * vfsmount).
+		 */
+		dentry = lookup_lck_len(name, base, strlen(name));
+		if (new_mnt)
+			*new_mnt = mntget(lower_path.mnt);
+		break;
+	default: /* all other real errors */
+		dentry = ERR_PTR(err);
+		break;
 	}
 
 	return dentry;
@@ -176,7 +176,8 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
 
 	/* properly initialize special inodes */
 	if (S_ISBLK(lower_inode->i_mode) || S_ISCHR(lower_inode->i_mode) ||
-			S_ISFIFO(lower_inode->i_mode) || S_ISSOCK(lower_inode->i_mode))
+			S_ISFIFO(lower_inode->i_mode)
+			|| S_ISSOCK(lower_inode->i_mode))
 		init_special_inode(inode, lower_inode->i_mode,
 				lower_inode->i_rdev);
 
@@ -204,7 +205,7 @@ int u2fs_interpose(struct dentry *dentry, struct super_block *sb)
 	struct super_block *left_sb;
 	struct dentry *l_dentry;
 
-	for(i=0; i < 2; i++) {
+	for (i = 0; i < 2; i++) {
 		l_dentry = u2fs_get_lower_dentry(dentry, i);
 		if (l_dentry && l_dentry->d_inode) {
 			lower_inode = l_dentry->d_inode;
@@ -263,7 +264,7 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 		goto out;
 
 	name = dentry->d_name.name;
-	for(i = 0; i < 2; i++) {
+	for (i = 0; i < 2; i++) {
 
 		parent_path = u2fs_get_path(parent, i);
 		/* now start the actual lookup procedure */
@@ -281,9 +282,10 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 			continue; /* XXX: should be BUG_ON */
 
 		/* check for whiteouts: stop lookup if found */
-		if(i == 0) {
+		if (i == 0) {
 			UDBG;
-			wh_lower_dentry = lookup_whiteout(name, lower_dir_dentry);
+			wh_lower_dentry = lookup_whiteout(name,
+				lower_dir_dentry);
 			if (IS_ERR(wh_lower_dentry)) {
 				err = PTR_ERR(wh_lower_dentry);
 				u2fs_put_reset_all_path(dentry);
@@ -296,7 +298,8 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 			dput(wh_lower_dentry);
 		}
 
-		lower_dentry = __lookup_one(lower_dir_dentry, lower_dir_mnt, name, &lower_mnt);
+		lower_dentry = __lookup_one(lower_dir_dentry,
+			lower_dir_mnt, name, &lower_mnt);
 
 		if (IS_ERR(lower_dentry)) {
 			err = PTR_ERR(lower_dentry);
@@ -310,7 +313,8 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 
 		/*
 		 * We always store the lower dentries above
-		 * even if the whole u2fs dentry is negative (i.e., no lower inodes).
+		 * even if the whole u2fs dentry is negative
+		 * (i.e., no lower inodes).
 		 */
 		if (!lower_dentry->d_inode)
 			continue;
@@ -319,9 +323,8 @@ static struct dentry *__u2fs_lookup(struct dentry *dentry, int flags)
 		valid_detry_found = true;
 	}
 
-	//Do we need to remove negative dentry??
-	if(valid_detry_found) {
-		//Found Dentry
+	if (valid_detry_found) {
+		/*Found Dentry*/
 		UDBG;
 		err = u2fs_interpose(dentry, dentry->d_sb);
 		if (err) /* path_put underlying path on error */
@@ -383,7 +386,6 @@ struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 {
 	struct dentry *ret;
 	int err = 0;
-	printk("in look up %s,\n", dentry->d_name.name);
 	BUG_ON(!nd);
 
 
@@ -403,6 +405,5 @@ struct dentry *u2fs_lookup(struct inode *dir, struct dentry *dentry,
 				u2fs_lower_inode(dentry->d_inode));
 
 out:
-	//release dentry
 	return ret;
 }
