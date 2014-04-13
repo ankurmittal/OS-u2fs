@@ -1,2 +1,44 @@
-u2fs was created using allthe code copied from wrapfs
+			U2FS - STACKABLE UNIFICATION FILE SYSTEM
+
+INSTALLATION: 
+-------------
+ 1. Make kernel using kernel.config provided in hw2 OR set CONFIG_U2_FS=m to .config file and do a make
+ 2. From hw2-amittal directory run 
+ 				insmod fs/u2fs.ko
+ 3. Create a left directory and a right directory
+ 4. Mount the file system using
+ 	mount -t u2fs -o ldir=<left_dir>,rdir=<right_dir> null /mnt/u2fs     #/mnt/u2fs should exists
+ 5. Now you can cd to /mnt/u2fs and issue normal file system commands
+
+DESIGN:
+-------
+ - WRAPFS was copied to new directory fs/u2fs and changes were made to create a loadable filesystem module.
+ - Then most of the code was ported from UNIONFS and changed as per requirement.
+
+DESIGN DECISIONS:
+-----------------
+ - U2FS dentry contains left and right path.
+ - U2FS inode contains just one lower inode as we jut need to store valid one. the low priority one can be accessed from The dentry node.
+ - U2FS superblock contains pointers toleft and right superblock.
+ - U2FS File contains pointer to left and right file.
+
+FEATURES IMPLEMENTED:
+---------------------
+ - File Lookup
+ 	To compile custom ls - do a make in hw2/coreutils, then run hw2/coreutils/src/ls as you will execute normal ls.
+	ls file was changed in hw2/coreutils/src/ls.c
+ - File Creation	
+ - Modifying Files	
+ - File Deletion	
+ - file operations: cp, cat, less, stat, df, symlink, chmod
+ - partially implemented(ie does not work when right branch is involved) : mv, link, rmdir
+
+ EXTRA CREDITS:
+ --------------
+ 1. Usekernel.config.ec present in hw2 directory or set CONFIG_U2_DUP_ELIMINATION=y in .config file and then do a make and install module and mount it.
+ 2. Now normal ls won't show duplicate entries.
+ 3. The code can be found in 'file.c' in u2fs_filldir function.
+ 
+	
+
 
