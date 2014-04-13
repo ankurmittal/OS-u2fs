@@ -119,6 +119,7 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
 	struct u2fs_inode_info *info;
 	struct inode *inode; /* the new inode to return */
 	int err;
+	int ino = iunique(sb, U2FS_ROOT_INO);
 
 	inode = iget5_locked(sb, /* our superblock */
 			/*
@@ -126,7 +127,7 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
 			 * also use "(unsigned long)lower_inode"
 			 * instead.
 			 */
-			lower_inode->i_ino, /* hashval */
+			ino, /* hashval */
 			u2fs_inode_test,	/* inode comparison function */
 			u2fs_inode_set, /* inode init function */
 			lower_inode); /* data passed to test+set fxns */
@@ -142,7 +143,7 @@ struct inode *u2fs_iget(struct super_block *sb, struct inode *lower_inode)
 	/* initialize new inode */
 	info = U2FS_I(inode);
 
-	inode->i_ino = lower_inode->i_ino;
+	inode->i_ino = ino;
 	if (!igrab(lower_inode)) {
 		err = -ESTALE;
 		return ERR_PTR(err);
