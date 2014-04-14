@@ -21,7 +21,6 @@ static int u2fs_create(struct inode *dir, struct dentry *dentry,
 
 	left_path = u2fs_get_path(dentry, 0);
 	lower_dentry = left_path->dentry;
-	//parent = u2fs_lock_parent(dentry);
 
 	err = mnt_want_write(left_path->mnt);
 	if (err)
@@ -65,7 +64,6 @@ out_unlock:
 out_mnt:
 	mnt_drop_write(left_path->mnt);
 out:
-	//u2fs_unlock_parent(dentry, parent);
 	return err;
 }
 
@@ -190,11 +188,8 @@ static int u2fs_unlink(struct inode *dir, struct dentry *dentry)
 		err = create_whiteout(dentry);
 	if (!err)
 		inode_dec_link_count(dentry->d_inode);
-	//fsstack_copy_attr_times(dir, lower_dir_inode);
-	//fsstack_copy_inode_size(dir, lower_dir_inode);
-	//set_nlink(dentry->d_inode,
-	//	  u2fs_lower_inode(dentry->d_inode)->i_nlink);
-	//dentry->d_inode->i_ctime = dir->i_ctime;
+	set_nlink(dentry->d_inode,
+		  u2fs_lower_inode(dentry->d_inode)->i_nlink);
 
 	d_drop(dentry); /* this is needed, else LTP fails (VFS won't do it) */
 	UDBG;
@@ -202,7 +197,6 @@ out:
 	mnt_drop_write(mnt);
 	UDBG;
 out_unlock:
-	//unlock_dir(lower_dir_dentry);
 	UDBG;
 	dput(lower_dentry);
 	UDBG;
@@ -259,8 +253,6 @@ static int u2fs_symlink(struct inode *dir, struct dentry *dentry,
 			u2fs_copy_attr_times(dir);
 			fsstack_copy_inode_size(dir,
 					lower_parent_dentry->d_inode);
-			/* update no. of links on parent directory */
-			//set_nlink(dir, u2fs_get_nlinks(dir));
 		}
 	}
 
@@ -321,7 +313,7 @@ static int u2fs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	fsstack_copy_inode_size(dir, lower_parent_dentry->d_inode);
 	/* update number of links on parent directory */
 
-	//	set_nlink(dir, u2fs_lower_inode(dir)->i_nlink);
+	set_nlink(dir, u2fs_lower_inode(dir)->i_nlink);
 
 out_unlock:
 	unlock_dir(lower_parent_dentry);

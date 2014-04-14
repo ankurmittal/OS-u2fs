@@ -47,12 +47,6 @@ static ssize_t u2fs_write(struct file *file, const char __user *buf,
 	struct file *lower_file;
 	struct dentry *dentry = file->f_path.dentry, *lower_dentry;
 
-	//u2fs_read_lock(dentry->d_sb, U2FS_SMUTEX_PARENT);
-	//u2fs_lock_dentry(dentry, U2FS_DMUTEX_CHILD);
-
-	//err = u2fs_file_revalidate(file, parent, true);
-	//if (unlikely(err))
-	//	goto out;
 	UDBG;
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 	if (!lower_dentry || !lower_dentry->d_inode)
@@ -67,11 +61,8 @@ static ssize_t u2fs_write(struct file *file, const char __user *buf,
 		fsstack_copy_attr_times(dentry->d_inode,
 				lower_file->f_path.dentry->d_inode);
 		U2FS_F(file)->wrote_to_file = true; /* for delayed copyup */
-		//	u2fs_check_file(file);
 	}
 
-	//u2fs_unlock_dentry(dentry);
-	//u2fs_read_unlock(dentry->d_sb);
 	return err;
 }
 
@@ -80,12 +71,10 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 		loff_t offset, u64 ino, unsigned int d_type)
 {
 	struct u2fs_getdents_buf *buf = dirent;
-	//struct filldir_node *found = NULL;
 	int err = 0;
 	int is_whiteout;
 	char *name = (char *) oname;
 	struct filldir_node *found = NULL;
-	//buf->filldir_called++;
 
 
 	is_whiteout = is_whiteout_name(&name, &namelen);
@@ -95,39 +84,20 @@ static int u2fs_filldir(void *dirent, const char *oname, int namelen,
 	if (!is_whiteout) {
 		/* Find Deleted Entry */
 		if (buf->is_right)
-			found = find_filldir_node(name, namelen, buf->heads, buf->heads_size);
+			found = find_filldir_node(name,
+					namelen, buf->heads, buf->heads_size);
 		if (found)
 			goto out;
-		//off_t pos = rdstate2offset(buf->rdstate);
 
 		/* Check how to send pos ? */
 		err = buf->filldir(buf->dirent, name, namelen, offset,
 				ino, d_type);
-		//buf->rdstate->offset++;
-		//verify_rdstate_offset(buf->rdstate);
 	}
 
 
-#if 0
-	/*
-	 * If we did fill it, stuff it in our hash, otherwise return an
-	 * error.
-	 */
-	if (err) {
-		buf->filldir_error = err;
-		goto out;
-	}
-
-	buf->entries_written++;
-#endif
 	if (!err && ((DUP_ELIM || is_whiteout) && !buf->is_right))
 		err = add_filldir_node(name, namelen,
 				is_whiteout, buf->heads, buf->heads_size);
-#if 0
-	if (err)
-		buf->filldir_error = err;
-
-#endif
 
 out:
 	return err;
@@ -144,7 +114,6 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 
 	struct u2fs_getdents_buf buf;
 	init_filldir_heads(filldir_heads, FILLDIR_SIZE);
-	printk("Read Dir Called\n");
 
 	buf.dirent = dirent;
 	buf.filldir = filldir;
@@ -153,7 +122,6 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 
 	for (index = 0; index < 2; index++) {
 		buf.is_right = (index == 1);
-		printk("lowerFile %d\n",index);
 		lower_file = u2fs_lower_file(file, index);
 		if (!lower_file)
 			continue;
@@ -162,7 +130,8 @@ static int u2fs_readdir(struct file *file, void *dirent, filldir_t filldir)
 		if (err >= 0)		/* copy the atime */
 			fsstack_copy_attr_atime(dentry->d_inode,
 					lower_file->f_path.dentry->d_inode);
-		else break;
+		else
+			break;
 	}
 	if (!err)
 		file->f_pos = DIREOF;
@@ -300,11 +269,6 @@ static int __open_dir(struct inode *inode, struct file *file,
 		if (!u2fs_get_lower_mnt(dentry, index))
 			u2fs_set_lower_mnt(dentry, index, lower_mnt);
 
-		/*
-		 * The branchget goes after the open, because otherwise
-		 * we would miss the reference on release.
-		 */
-		//branchget(inode->i_sb, index);
 	}
 
 	return 0;
@@ -321,7 +285,6 @@ static int __open_file(struct inode *inode, struct file *file,
 	struct vfsmount *lower_mnt;
 	int bIndex = 0;
 
-	printk("Open File: %s\n", dentry->d_name.name);
 	lower_dentry = u2fs_get_lower_dentry(dentry, 0);
 	if (!lower_dentry || !lower_dentry->d_inode) {
 		lower_dentry = u2fs_get_lower_dentry(dentry, 1);
@@ -339,7 +302,6 @@ static int __open_file(struct inode *inode, struct file *file,
 		 * if the open will change the file, copy it up otherwise
 		 * defer it.
 		 */
-		printk("in if\n");
 		if ((lower_flags & O_TRUNC) || (lower_flags & O_APPEND)) {
 			int size = i_size_read(lower_dentry->d_inode);
 			int err = -EROFS;
@@ -369,7 +331,6 @@ static int __open_file(struct inode *inode, struct file *file,
 		return PTR_ERR(lower_file);
 
 	u2fs_set_lower_file(file, bIndex, lower_file);
-	//branchget(inode->i_sb, bstart);
 
 	return 0;
 }
@@ -379,11 +340,8 @@ int u2fs_open(struct inode *inode, struct file *file)
 	int err = 0;
 	struct dentry *dentry = file->f_path.dentry;
 	struct dentry *parent;
-	//	int valid = 0;
 
-	//u2fs_read_lock(inode->i_sb, U2FS_SMUTEX_PARENT);
 	parent = u2fs_lock_parent(dentry);
-	//u2fs_lock_dentry(dentry, U2FS_DMUTEX_CHILD);
 
 	/* don't open unhashed/deleted files */
 	if (d_deleted(dentry)) {
@@ -421,14 +379,10 @@ int u2fs_open(struct inode *inode, struct file *file)
 	}
 out_nofree:
 	if (!err) {
-		//u2fs_postcopyup_setmnt(dentry);
+		u2fs_postcopyup_setmnt(dentry);
 		fsstack_copy_attr_all(inode, u2fs_lower_inode(inode));
-		//u2fs_check_file(file);
-		//u2fs_check_inode(inode);
 	}
-	//u2fs_unlock_dentry(dentry);
 	u2fs_unlock_parent(dentry, parent);
-	//u2fs_read_unlock(inode->i_sb);
 	return err;
 }
 

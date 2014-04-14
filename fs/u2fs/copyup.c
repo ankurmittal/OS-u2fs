@@ -252,7 +252,6 @@ int copyup_dentry(struct inode *dir, struct dentry *dentry,
 	mm_segment_t oldfs;
 	char *symbuf = NULL;
 
-	//verify_locked(dentry);
 
 	sb = dir->i_sb;
 
@@ -443,7 +442,6 @@ struct dentry *create_parents(struct inode *dir, struct dentry *dentry,
 	int bindex = 0;
 
 	UDBG;
-	//verify_locked(dentry);
 
 
 
