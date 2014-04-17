@@ -1,0 +1,213 @@
+		CSE-506 (Spring 2014) Homework Assignment #2
+		  (100 points, 18% of your overall grade)
+			    Version 1 (3/11/2014)
+		       Due Sunday 4/13/2014 @ 11:59pm
+
+* PURPOSE:
+
+To become familiar with the VFS layer of Linux, and especially with
+extensible file systems APIs.  To build a useful file system using stacking
+technologies.
+
+You will use the "wrapfs" stackable file system as a starting point for this
+assignment.  You will modify wrapfs to add unioning support.
+
+You must work on HW2 *alone*.  No teams allowed!
+
+* RESOURCES
+
+For this assignment, the following resources would be handy.  Study them
+well.
+
+(a) The Linux kernel source code, obviously.  Pay special attention to the
+    Documentation/ subdirectory, esp. files related to locking,
+    filesystems/*.txt, vfs.txt, and others.  There's a lot of good stuff
+    there, which you'd have to find and read carefully.
+
+(b) The Wrapfs kernel sources in the hw2-USER git repository that each of
+    you have, under fs/wrapfs.  Note also the file
+    Documentation/filesystems/wrapfs.txt.  This Wrapfs file system is just
+    1,800 LoC, and hence is easier to study in its entirety.
+
+(c) Assorted papers related to stackable file systems which were published
+    here:
+
+	http://www.fsl.cs.sunysb.edu/project-fist.html
+
+    Especially useful would be the following:
+
+	"UnionFS: User- and Community-oriented Development of a Unification Filesystem"
+	"Versatility and Unix Semantics in Namespace Unification"
+	"I3FS: An In-Kernel Integrity Checker and Intrusion Detection File System"
+	"A Stackable File System Interface for Linux"
+	"Extending File Systems Using Stackable Templates"
+	"FiST: A Language for Stackable File Systems"
+	"On Incremental File System Development"
+
+(d) Browsable GIT-Web sources here, especially wrapfs-3.x.y and
+    unionfs-3.x.y sources:
+
+	http://git.fsl.cs.sunysb.edu/
+
+* INTRODUCTION:
+
+In a stackable file system, each VFS-based object at the stackable file
+system (e.g., in Wrapfs) has a link to one other object on the lower file
+system (sometimes called the "hidden" object).  We identify this
+symbolically as X->X' where "X" is an object at the upper layer, and X' is
+an object on the lower layer.  This form of stacking is a single-layer
+linear stacking.  In a "fan-out" stackable file system, each VFS object X
+points to two or more objects below: X -> (X1', X2', ..., Xn').  Fan-out
+file systems can essentially access two or more "branches" below.  This can
+be used to produce interesting file systems: replication, fail-over,
+load-balancing, unification, and more.
+
+* DETAILS:
+
+Write a stackable, fan-out, unification file system called u2fs.  u2fs is
+very similar to FSL's Unionfs, only that Unionfs is much more complex and
+has over 10,000 LoC (feel free to study Unionfs and borrow code from it,
+with proper attribution).  u2fs should have only two branches, which I will
+identify as the "left branch" (LB) and the "right branch" (RB).  LB has
+higher priority than RB.  RB should be assumed to be readonly: that is, no
+file there should be modified, as if it came, say, from a readonly CDROM;
+files should be modified in LB only.  Pictorially, this could be seen as
+follows:
+
+                u2fs
+                 /\
+                /  \
+               /    \
+             LB      RB
+
+The purpose of u2fs is to take two separate directory trees, and to combine
+their contents recursively such that it appears, at the u2fs level, that the
+two directories (LB and RB) have been combined.  For all intents and
+purposes, u2fs should behave as if you took the LB directory, and tar-ed it
+on top of the RB directory, similar to this:
+
+	$ cd LB
+	$ tar cf - . | ( cd RB && tar xf -)
+
+That is, the two directory trees are merged directory by directory, and
+same-named files in LB will overwrite those in RB.  Note that the files 
+physically stay in the same underlying location as they were before.  The
+benefit of u2fs is
+that you can keep the underlying directories separate, which is convenient
+for software management as well as Live-CDs, but at the same time provide a
+convenient merged view of the two directories to users.
+
+You will need to modify  wrapfs extensively but only as needed. 
+The challenge in this assignment is to maintain as many UNIX semantics as
+possible through u2fs, even though LB and RB are physically separate.  For
+example:
+
+1. When you look up a file in u2fs, which branch is looked at?  What
+   happens if a file exists in both branches?  (Hint: by simulating tar-ing
+   of LB on top of RB, you've essentially defining a priority).  You should
+   lookup at the LB first, then the RB; return the first match.
+
+2. When you create a new file, which branch do you create the file?  You
+   should create files in LB because RB is designated readonly.
+
+3. When you modify an existing file in LB, it gets modified there.  But if a
+   user tries to modify a file that exists in RB only, you have to copy the
+   file up from RB to LB, and modify it there.  This is called a "copyup"
+   operation in unioning file systems.
+
+4. What happens if you delete a file (or directory) that is in the readonly
+   RB branch?  Recall you can't really delete files in RB.  So the trick is
+   to create a "whiteout" entry in LB, whose presence indicates the absence
+   of the file in RB.  Other names for this is a "tombstone," "mask," or
+   "negative cache" entry.  You'll have to modify ->lookup and directory
+   reading to handle this case.  (Hint: Unionfs creates a .wh.F file to mask
+   out file F.)
+
+5. When listing a directory, you need to merge the contents of LB and RB, by
+   listing the contents of LB and then RB.  But what happens if you have
+   duplicates?  How can you eliminate them?  For the main body of this
+   assignment, it is OK to eliminate duplicates by modifying a copy of
+   /bin/ls in user level (but see also the Extra Credit section below).
+
+6. What happens to *all* other file system operations?  You should go over
+   every possible VFS op and decide how, if any, should u2fs handle that
+   operation.  Your README file should *clearly* but briefly describe how
+   you handle each operation you've changed, including listing any
+   limitations you have (i.e., ops you don't handle fully).
+
+7. What inode numbers should your u2fs inodes have?  I suggest you generate
+   them dynamically using iunique or so.
+
+8. Currently the Wrapfs stackable file system templates store one pointer in
+   each object for the lower object.  You will need to store two, thus
+   modifying key data structures in *.h files.  Is it necessary to store two
+   objects for every type of object?  If it is possible to save memory and
+   minimize the amount of code that needs to change, then you should store
+   two lower object pointers only for those objects that need it.
+
+An example of how you would mount u2fs is as follows:
+
+# mount -t u2fs -o ldir=/left/dir,rdir=/right/dir null /mnt/u2fs
+
+After that, you should be able to "cd" to /mnt/u2fs and issue normal file
+system commands.
+
+* SUBMISSION
+
+Simply git-commit and git-push your changes to your cloned git repository; a
+successful git-push will result in an email going to you, confirming the
+commit and push.  Don't forget to include the README.HW2 file.  If for some
+reason you decided to add other file(s) to your GIT repository, please
+mention this in README.HW2 so we don't miss it during grading (and justify
+why a new file was needed).
+
+Also note that we will just do a git clone of your final repository and run
+make, make modules_install, and make install as usual.  You must not assume
+that we will do ANY modification in your code.  Your code MUST compile and
+run as it is.  You will lose all points in submission section IF your code
+doesn't compile/run as checked out.
+
+
+
+If you attempt any EXTRA CREDIT functionality, your README MUST specify
+exactly how to compile your code with extra credit enabled.  By default,
+your code MUST NOT compile extra credit code.
+
+For consistency, use this kernel config as your starting template:
+
+	http://www.cs.sunysb.edu/~ezk/cse506-s14/vmware.config
+
+* EXTRA CREDIT (OPTIONAL)
+
+A. [10 pts] Duplicate name elimination
+
+For this extra credit, add an in-kernel mechanism for eliminating duplicates
+when listing two directories (readdir) that contain files with the same
+name.  There are multiple ways to achieve this duplicate elimination.
+However, you should consider how to do so as efficiently as possible.  Avoid
+consuming too much memory or CPU for this task.
+
+For example, the most naive method of eliminating duplicates is as follows:
+each time u2fs has to run ->readdir() on RB, it will essentially "stat" each
+file entry that appears in RB, to see if it also exists in LB, and if it
+exists, not list it.  While this technique will work, it is slow and does
+not scale well if you have u2fs working on dozens of branches, or truly huge
+directories.
+
+The challenge in this extra credit part is that the getdents(2) API is
+somewhat limited in its abilities to accommodate duplicate elimination
+(read: keeping "state" behind in the kernel).
+
+Note that this duplicate elimination should be done entirely in the kernel,
+without changing user-level programs.  However, I will consider innovative
+approaches that require *small* user-land changes as long as the change is
+small and the benefit (in terms of efficiency) is large.
+
+For this EC, it is acceptable to take the actual dup-elimination code from
+Unionfs and port it to your simplified u2fs (porting kernel code is an
+interesting challenge in its own right, sometimes easier, sometimes
+harder).
+
+* ChangeLog: a list of changes that this description had
+
+v1: original version
